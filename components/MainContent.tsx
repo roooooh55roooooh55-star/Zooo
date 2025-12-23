@@ -4,9 +4,7 @@ import { Video, UserInteractions } from '../types.ts';
 
 const getDeterministicStats = (url: string) => {
   let hash = 0;
-  for (let i = 0; i < url.length; i++) {
-    hash = url.charCodeAt(i) + ((hash << 5) - hash);
-  }
+  for (let i = 0; i < url.length; i++) hash = url.charCodeAt(i) + ((hash << 5) - hash);
   const likesSeed = Math.abs(hash % 1500000) + 500000;
   const viewsSeed = Math.abs(hash % 45000000) + 5000000;
   return { likes: likesSeed, views: viewsSeed };
@@ -21,9 +19,7 @@ const formatBigNumber = (num: number) => {
 const isRecentVideo = (video: Video) => {
   if (!video.created_at) return false;
   const videoDate = new Date(video.created_at).getTime();
-  const now = new Date().getTime();
-  const diffHours = (now - videoDate) / (1000 * 60 * 60);
-  return diffHours < 48;
+  return (new Date().getTime() - videoDate) / (1000 * 60 * 60) < 48;
 };
 
 interface VideoPreviewProps {
@@ -41,8 +37,9 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
   useEffect(() => { 
     const v = videoRef.current;
     if (!v) return;
+    // تحسين التشغيل التلقائي للمعاينة
     v.play().catch(() => {});
-    const handleTimeUpdate = () => { if (v.currentTime >= 5) v.currentTime = 0; };
+    const handleTimeUpdate = () => { if (v.currentTime >= 6) v.currentTime = 0; };
     v.addEventListener('timeupdate', handleTimeUpdate);
     return () => {
       v.removeEventListener('timeupdate', handleTimeUpdate);
@@ -51,29 +48,29 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
   }, [video.video_url]);
 
   return (
-    <div onClick={onClick} className={`relative overflow-hidden cursor-pointer group bg-neutral-900 border border-white/5 transition-all active:scale-95 animate-in fade-in zoom-in duration-500 ${className}`}>
-      <video ref={videoRef} src={video.video_url} muted autoPlay loop playsInline preload="auto" className="w-full h-full object-cover transition-transform group-hover:scale-110 relative z-10" />
+    <div onClick={onClick} className={`relative overflow-hidden cursor-pointer group bg-black border border-white/5 transition-all active:scale-95 duration-300 ${className}`}>
+      <video 
+        ref={videoRef} 
+        src={video.video_url} 
+        muted autoPlay loop playsInline 
+        preload="metadata" 
+        className="w-full h-full object-cover relative z-10" 
+      />
       
       {isNew && (
-        <div className="absolute top-2 right-2 z-30 bg-red-600 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full shadow-[0_0_15px_rgba(220,38,38,1)] border border-red-400 animate-pulse">
+        <div className="absolute top-2 right-2 z-30 bg-red-600 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full shadow-[0_0_10px_red]">
           جديد
         </div>
       )}
 
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent p-3 flex flex-col justify-end z-20">
-        <p className="text-[10px] font-bold text-white line-clamp-2 text-right">{video.title || "الحديقة المرعبة"}</p>
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent p-3 flex flex-col justify-end z-20">
+        <p className="text-[10px] font-bold text-white line-clamp-1 text-right">{video.title}</p>
         <div className="flex items-center justify-between mt-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[9px] text-red-500 font-bold flex items-center gap-0.5">
-              <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-              {formatBigNumber(stats.likes)}
-            </span>
-            <span className="text-[9px] text-blue-400 font-bold flex items-center gap-0.5">
-              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-              {formatBigNumber(stats.views)}
-            </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[8px] text-red-500 font-black">{formatBigNumber(stats.likes)}</span>
+            <span className="text-[8px] text-blue-400 font-black">{formatBigNumber(stats.views)}</span>
           </div>
-          {isLong && <span className="text-[8px] bg-red-600 px-1 py-0.5 rounded text-white font-black shadow-lg">LONG</span>}
+          {isLong && <span className="text-[7px] bg-red-600 px-1 rounded text-white font-black">LONG</span>}
         </div>
       </div>
     </div>
@@ -87,47 +84,17 @@ interface DraggableMarqueeProps {
 
 const DraggableMarquee: React.FC<DraggableMarqueeProps> = ({ videos, onPlay }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [isInteracting, setIsInteracting] = useState(false);
-  const animationRef = useRef<number>(0);
-
-  const displayVideos = useMemo(() => {
-    const map = new Map();
-    videos.forEach(v => map.set(v.id || v.video_url, v));
-    return Array.from(map.values());
-  }, [videos]);
-
-  const step = () => {
-    if (!isInteracting && scrollRef.current && displayVideos.length > 1) {
-      scrollRef.current.scrollLeft -= 0.6;
-      if (Math.abs(scrollRef.current.scrollLeft) >= (scrollRef.current.scrollWidth - scrollRef.current.clientWidth)) {
-         scrollRef.current.scrollLeft = 0;
-      }
-    }
-    animationRef.current = requestAnimationFrame(step);
-  };
-
-  useEffect(() => {
-    animationRef.current = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(animationRef.current);
-  }, [isInteracting, displayVideos]);
-
   return (
-    <div 
-      ref={scrollRef}
-      className="flex gap-4 overflow-x-auto scrollbar-hide select-none cursor-grab active:cursor-grabbing px-4 pb-4"
-      onPointerDown={() => setIsInteracting(true)}
-      onPointerUp={() => setTimeout(() => setIsInteracting(false), 2000)}
-      style={{ direction: 'rtl' }}
-    >
-      {displayVideos.map((video, i) => (
-        <div key={`${video.id || video.video_url}-${i}`} onClick={() => onPlay(video)} className="flex-shrink-0 w-64">
-          <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-xl mb-2 aspect-video bg-black">
-            <video src={video.video_url} muted loop playsInline autoPlay className="w-full h-full object-cover opacity-80 pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-full h-1 bg-white/10 z-20">
-              <div className="h-full bg-yellow-500 shadow-[0_0_5px_rgba(234,179,8,1)]" style={{ width: `${video.progress * 100}%` }}></div>
+    <div ref={scrollRef} className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-4" style={{ direction: 'rtl' }}>
+      {videos.map((video, i) => (
+        <div key={`${video.id}-${i}`} onClick={() => onPlay(video)} className="flex-shrink-0 w-48">
+          <div className="relative rounded-xl overflow-hidden aspect-video bg-neutral-900 border border-white/10">
+            <video src={video.video_url} muted loop playsInline autoPlay className="w-full h-full object-cover opacity-60" />
+            <div className="absolute bottom-0 left-0 w-full h-1 bg-white/10">
+              <div className="h-full bg-red-600" style={{ width: `${video.progress * 100}%` }}></div>
             </div>
           </div>
-          <p className="text-[10px] font-bold text-gray-300 truncate text-right px-1">{video.title}</p>
+          <p className="text-[9px] font-bold text-gray-400 truncate mt-1 text-right px-1">{video.title}</p>
         </div>
       ))}
     </div>
@@ -145,143 +112,104 @@ interface MainContentProps {
 
 const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayShort, onPlayLong, onViewUnwatched, loading }) => {
   const unwatchedVideos = useMemo(() => {
-    const uniqueMap = new Map();
-    [...interactions.watchHistory].forEach(h => {
+    const map = new Map();
+    interactions.watchHistory.forEach(h => {
       const video = videos.find(v => (v.id === h.id || v.video_url === h.id));
-      if (video && h.progress > 0.05 && h.progress < 0.95) {
-        uniqueMap.set(video.id || video.video_url, { ...video, progress: h.progress });
-      }
+      if (video && h.progress > 0.05 && h.progress < 0.95) map.set(video.id || video.video_url, { ...video, progress: h.progress });
     });
-    return Array.from(uniqueMap.values()).reverse() as (Video & { progress: number })[];
+    return Array.from(map.values()).reverse() as (Video & { progress: number })[];
   }, [videos, interactions.watchHistory]);
 
   const allShorts = useMemo(() => videos.filter(v => v.type === 'short'), [videos]);
   const allLongs = useMemo(() => videos.filter(v => v.type === 'long'), [videos]);
 
-  // تقسيم الفيديوهات بناءً على طلب المستخدم
   const topShorts = useMemo(() => allShorts.slice(0, 4), [allShorts]);
   const extraShorts = useMemo(() => allShorts.slice(4, 8), [allShorts]);
-  const bottomShorts = useMemo(() => allShorts.slice(8), [allShorts]);
+  const remainingShorts = useMemo(() => allShorts.slice(8), [allShorts]);
 
-  const section1Longs = useMemo(() => allLongs.slice(0, 4), [allLongs]);
-  const section2Longs = useMemo(() => allLongs.slice(4, 8), [allLongs]);
+  const topLongs = useMemo(() => allLongs.slice(0, 4), [allLongs]);
+  const extraLongs = useMemo(() => allLongs.slice(4, 8), [allLongs]);
 
   if (loading && videos.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-20 min-h-[60vh]">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-gray-400 font-bold animate-pulse text-center text-sm italic">نستكشف أسرار الحديقة...</p>
+      <div className="flex flex-col items-center justify-center p-20 min-h-[50vh]">
+        <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-gray-500 font-bold mt-4 text-xs italic">جاري استحضار الفيديوهات...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2 pb-32">
-      {/* 1. قسم الحديقة المرعبة (أول 4 شورتس) */}
-      <section className="mt-2">
-        <div className="flex items-center gap-3 mb-4 px-1">
-          <div className="relative">
-            <div className="absolute inset-0 bg-red-600 rounded-full blur-[8px] opacity-40"></div>
-            <img src="https://i.top4top.io/p_3643ksmii1.jpg" alt="Logo" className="relative w-8 h-8 rounded-full border border-red-600 object-cover" />
-          </div>
-          <h2 className="text-xl font-black text-red-600 italic tracking-tighter">الحديقة المرعبة</h2>
-          <div className="flex-grow h-[1px] bg-gradient-to-l from-red-600/30 to-transparent"></div>
+    <div className="flex flex-col gap-10 pb-32">
+      {/* 1. الحديقة المرعبة (4 شورتس) */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <img src="https://i.top4top.io/p_3643ksmii1.jpg" className="w-7 h-7 rounded-full border border-red-600" />
+          <h2 className="text-lg font-black text-red-600 italic">الحديقة المرعبة</h2>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          {topShorts.map((video) => (
-            <VideoPreview key={video.id || video.video_url} video={video} onClick={() => onPlayShort(video, allShorts)} className="aspect-[9/16] rounded-2xl shadow-lg shadow-black/50" />
-          ))}
+          {topShorts.map((v) => <VideoPreview key={v.id || v.video_url} video={v} onClick={() => onPlayShort(v, allShorts)} className="aspect-[9/16] rounded-2xl shadow-xl" />)}
         </div>
       </section>
 
-      {/* 2. قسم مكمل رعب (أفقي) */}
+      {/* 2. مكمل رعب */}
       {unwatchedVideos.length > 0 && (
-        <section className="mt-8">
-          <div className="flex items-center justify-between mb-4 px-1">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(234,179,8,0.8)]"></div>
-              <h2 className="text-lg font-black text-white italic">مكمل رعب</h2>
-            </div>
-            <button onClick={onViewUnwatched} className="text-[10px] font-bold text-yellow-500/60 hover:text-yellow-500 transition-colors">عرض الكل</button>
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-md font-black text-white italic">مكمل رعب</h2>
+            <button onClick={onViewUnwatched} className="text-[9px] text-yellow-500 font-bold">عرض الكل</button>
           </div>
-          <DraggableMarquee videos={unwatchedVideos} onPlay={(video) => video.type === 'short' ? onPlayShort(video, allShorts) : onPlayLong(video, true)} />
+          <DraggableMarquee videos={unwatchedVideos} onPlay={(v) => v.type === 'short' ? onPlayShort(v, allShorts) : onPlayLong(v, true)} />
         </section>
       )}
 
-      {/* 3. قسم سلاسل الحديقة (أول 4 طويلة) */}
-      <section className="mt-8">
-        <div className="flex items-center gap-2 mb-6 px-1">
-          <div className="w-1.5 h-6 bg-green-500 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.3)]"></div>
-          <h2 className="text-xl font-black text-white">سلاسل الحديقة</h2>
-        </div>
+      {/* 3. سلاسل الحديقة (4 طويلة) */}
+      <section>
+        <h2 className="text-lg font-black text-white mb-4 pr-2 border-r-4 border-green-500">سلاسل الحديقة</h2>
         <div className="flex flex-col gap-6">
-          {section1Longs.map((video) => (
-             <div key={video.id || video.video_url} onClick={() => onPlayLong(video, true)} className="bg-neutral-900/40 rounded-[2.5rem] border border-white/5 overflow-hidden active:scale-[0.98] transition-all shadow-2xl">
-              <div className="relative aspect-video w-full bg-black">
-                <video src={video.video_url} muted autoPlay loop playsInline className="w-full h-full object-cover relative z-10" />
-                {isRecentVideo(video) && (
-                   <div className="absolute top-5 left-5 bg-red-600/90 backdrop-blur-lg text-[10px] px-3 py-1 rounded-full font-black text-white shadow-xl z-20 border border-red-400">جديد</div>
-                )}
+          {topLongs.map((v) => (
+            <div key={v.id || v.video_url} onClick={() => onPlayLong(v, true)} className="bg-neutral-900 rounded-[2rem] overflow-hidden border border-white/5 active:scale-95 transition-all">
+              <div className="relative aspect-video">
+                <video src={v.video_url} muted autoPlay loop playsInline className="w-full h-full object-cover" />
+                {isRecentVideo(v) && <div className="absolute top-4 left-4 bg-red-600 text-[9px] px-2 py-1 rounded-full font-black text-white">جديد</div>}
               </div>
-              <div className="p-6 flex items-center justify-between z-20 bg-[#0f0f0f]/80 backdrop-blur-sm">
-                <h3 className="text-base font-bold line-clamp-1 text-right">{video.title}</h3>
-              </div>
+              <div className="p-4 bg-black/40"><h3 className="text-sm font-bold text-right">{v.title}</h3></div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* 4. قسم لقطات إضافية (4 شورتس تالية) */}
+      {/* 4. لقطات إضافية (4 شورتس تالية) */}
       {extraShorts.length > 0 && (
-        <section className="mt-12">
-          <div className="flex items-center gap-2 mb-6 px-1">
-            <div className="w-1.5 h-6 bg-red-600 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.3)]"></div>
-            <h2 className="text-xl font-black text-white italic">لقطات إضافية</h2>
-          </div>
+        <section>
+          <h2 className="text-lg font-black text-white mb-4 pr-2 border-r-4 border-red-600">لقطات إضافية</h2>
           <div className="grid grid-cols-2 gap-3">
-            {extraShorts.map((video) => (
-              <VideoPreview key={video.id || video.video_url} video={video} onClick={() => onPlayShort(video, allShorts)} className="aspect-[9/16] rounded-2xl shadow-lg shadow-black/50" />
-            ))}
+            {extraShorts.map((v) => <VideoPreview key={v.id || v.video_url} video={v} onClick={() => onPlayShort(v, allShorts)} className="aspect-[9/16] rounded-2xl shadow-xl" />)}
           </div>
         </section>
       )}
 
-      {/* 5. قسم فيديوهات طويلة (4 طويلة تالية) */}
-      {section2Longs.length > 0 && (
-        <section className="mt-12">
-          <div className="flex items-center gap-2 mb-6 px-1">
-            <div className="w-1.5 h-6 bg-blue-600 rounded-full shadow-[0_0_10px_rgba(37,99,235,0.3)]"></div>
-            <h2 className="text-xl font-black text-white italic">فيديوهات طويلة</h2>
-          </div>
+      {/* 5. فيديوهات طويلة (4 طويلة تالية) */}
+      {extraLongs.length > 0 && (
+        <section>
+          <h2 className="text-lg font-black text-white mb-4 pr-2 border-r-4 border-blue-600">فيديوهات طويلة</h2>
           <div className="flex flex-col gap-6">
-            {section2Longs.map((video) => (
-               <div key={video.id || video.video_url} onClick={() => onPlayLong(video, true)} className="bg-neutral-900/40 rounded-[2.5rem] border border-white/5 overflow-hidden active:scale-[0.98] transition-all shadow-2xl">
-                <div className="relative aspect-video w-full bg-black">
-                  <video src={video.video_url} muted autoPlay loop playsInline className="w-full h-full object-cover relative z-10" />
-                  {isRecentVideo(video) && (
-                   <div className="absolute top-5 left-5 bg-red-600/90 backdrop-blur-lg text-[10px] px-3 py-1 rounded-full font-black text-white shadow-xl z-20 border border-red-400">جديد</div>
-                  )}
-                </div>
-                <div className="p-6 flex items-center justify-between z-20 bg-[#0f0f0f]/80 backdrop-blur-sm">
-                  <h3 className="text-base font-bold line-clamp-1 text-right">{video.title}</h3>
-                </div>
+            {extraLongs.map((v) => (
+              <div key={v.id || v.video_url} onClick={() => onPlayLong(v, true)} className="bg-neutral-900 rounded-[2rem] overflow-hidden border border-white/5 active:scale-95 transition-all">
+                <div className="relative aspect-video"><video src={v.video_url} muted autoPlay loop playsInline className="w-full h-full object-cover" /></div>
+                <div className="p-4 bg-black/40"><h3 className="text-sm font-bold text-right">{v.title}</h3></div>
               </div>
             ))}
           </div>
         </section>
       )}
 
-      {/* 6. قسم شورتس (باقي فيديوهات الشورتس) */}
-      {bottomShorts.length > 0 && (
-        <section className="mt-12">
-          <div className="flex items-center gap-2 mb-6 px-1">
-            <div className="w-1.5 h-6 bg-yellow-600 rounded-full shadow-[0_0_10px_rgba(234,179,8,0.3)]"></div>
-            <h2 className="text-xl font-black text-white italic">شورتس</h2>
-          </div>
+      {/* 6. شورتس (باقي الشورتس) */}
+      {remainingShorts.length > 0 && (
+        <section>
+          <h2 className="text-lg font-black text-white mb-4 pr-2 border-r-4 border-yellow-600">شورتس</h2>
           <div className="grid grid-cols-2 gap-3">
-            {bottomShorts.map((video) => (
-              <VideoPreview key={video.id || video.video_url} video={video} onClick={() => onPlayShort(video, allShorts)} className="aspect-[9/16] rounded-2xl shadow-lg shadow-black/50" />
-            ))}
+            {remainingShorts.map((v) => <VideoPreview key={v.id || v.video_url} video={v} onClick={() => onPlayShort(v, allShorts)} className="aspect-[9/16] rounded-2xl shadow-xl" />)}
           </div>
         </section>
       )}
