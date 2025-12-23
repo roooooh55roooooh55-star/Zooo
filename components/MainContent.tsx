@@ -23,7 +23,7 @@ const isRecentVideo = (video: Video) => {
   const videoDate = new Date(video.created_at).getTime();
   const now = new Date().getTime();
   const diffHours = (now - videoDate) / (1000 * 60 * 60);
-  return diffHours < 48; // أي فيديو أضيف في آخر يومين يعتبر جديداً
+  return diffHours < 48;
 };
 
 interface VideoPreviewProps {
@@ -158,8 +158,12 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
   const allShorts = useMemo(() => videos.filter(v => v.type === 'short'), [videos]);
   const allLongs = useMemo(() => videos.filter(v => v.type === 'long'), [videos]);
 
-  const shortGroups = [allShorts.slice(0, 4), allShorts.slice(4, 8)];
-  const longGroups = [allLongs.slice(0, 4), allLongs.slice(4, 8)];
+  // تقسيم الشورتس بدقة إلى 4 في القسم العلوي و 4 في "لقطات إضافية"
+  const topShorts = useMemo(() => allShorts.slice(0, 4), [allShorts]);
+  const extraShorts = useMemo(() => allShorts.slice(4, 8), [allShorts]);
+
+  const topLongs = useMemo(() => allLongs.slice(0, 4), [allLongs]);
+  const extraLongs = useMemo(() => allLongs.slice(4, 8), [allLongs]);
 
   if (loading && videos.length === 0) {
     return (
@@ -182,7 +186,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
           <div className="flex-grow h-[1px] bg-gradient-to-l from-red-600/30 to-transparent"></div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          {shortGroups[0].map((video) => (
+          {topShorts.map((video) => (
             <VideoPreview key={video.id || video.video_url} video={video} onClick={() => onPlayShort(video, allShorts)} className="aspect-[9/16] rounded-2xl shadow-lg shadow-black/50" />
           ))}
         </div>
@@ -207,7 +211,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
           <h2 className="text-xl font-black text-white">سلاسل الحديقة</h2>
         </div>
         <div className="flex flex-col gap-6">
-          {longGroups[0].map((video) => (
+          {topLongs.map((video) => (
              <div key={video.id || video.video_url} onClick={() => onPlayLong(video, true)} className="bg-neutral-900/40 rounded-[2.5rem] border border-white/5 overflow-hidden active:scale-[0.98] transition-all shadow-2xl">
               <div className="relative aspect-video w-full bg-black">
                 <video src={video.video_url} muted autoPlay loop playsInline className="w-full h-full object-cover relative z-10" />
@@ -223,28 +227,28 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </div>
       </section>
 
-      {shortGroups[1].length > 0 && (
+      {extraShorts.length > 0 && (
         <section className="mt-12">
           <div className="flex items-center gap-2 mb-6 px-1">
             <div className="w-1.5 h-6 bg-red-600 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.3)]"></div>
             <h2 className="text-xl font-black text-white italic">لقطات إضافية</h2>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            {shortGroups[1].map((video) => (
+            {extraShorts.map((video) => (
               <VideoPreview key={video.id || video.video_url} video={video} onClick={() => onPlayShort(video, allShorts)} className="aspect-[9/16] rounded-2xl shadow-lg shadow-black/50" />
             ))}
           </div>
         </section>
       )}
 
-      {longGroups[1].length > 0 && (
+      {extraLongs.length > 0 && (
         <section className="mt-12">
           <div className="flex items-center gap-2 mb-6 px-1">
             <div className="w-1.5 h-6 bg-blue-600 rounded-full shadow-[0_0_10px_rgba(37,99,235,0.3)]"></div>
             <h2 className="text-xl font-black text-white italic">سلاسل غامضة</h2>
           </div>
           <div className="flex flex-col gap-6">
-            {longGroups[1].map((video) => (
+            {extraLongs.map((video) => (
                <div key={video.id || video.video_url} onClick={() => onPlayLong(video, true)} className="bg-neutral-900/40 rounded-[2.5rem] border border-white/5 overflow-hidden active:scale-[0.98] transition-all shadow-2xl">
                 <div className="relative aspect-video w-full bg-black">
                   <video src={video.video_url} muted autoPlay loop playsInline className="w-full h-full object-cover relative z-10" />

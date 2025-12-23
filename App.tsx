@@ -22,34 +22,24 @@ const shuffleArray = (array: any[]) => {
   return shuffled;
 };
 
-const preloadVideoFile = (url: string) => {
-  const link = document.createElement('link');
-  link.rel = 'preload';
-  link.as = 'video';
-  link.href = url;
-  document.head.appendChild(link);
-};
-
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.HOME);
-  const [videos, setVideos] = useState<Video[]>([]);
+  const [rawVideos, setRawVideos] = useState<Video[]>([]); // المخزن الشامل لكل الفيديوهات
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedShort, setSelectedShort] = useState<{ video: Video, list: Video[] } | null>(null);
   const [selectedLong, setSelectedLong] = useState<{ video: Video, list: Video[], autoNext: boolean } | null>(null);
   
-  // تتبع الفيديوهات التي تم عرضها في الواجهة خلال هذه الجلسة لمنع التكرار
-  const [sessionShownIds, setSessionShownIds] = useState<Set<string>>(new Set());
-  
-  const touchStart = useRef<number>(0);
+  const [sessionNonce, setSessionNonce] = useState(0); // مفتاح لتغيير الترتيب عند السحب
   const [pullDistance, setPullDistance] = useState(0);
+  const touchStart = useRef<number>(0);
 
   const [interactions, setInteractions] = useState<UserInteractions>(() => {
     const saved = localStorage.getItem('al-hadiqa-interactions');
     return saved ? JSON.parse(saved) : { likedIds: [], dislikedIds: [], savedIds: [], watchHistory: [] };
   });
 
-  // حماية المحتوى والنسخ
+  // حماية المحتوى
   useEffect(() => {
     const preventAction = (e: Event) => e.preventDefault();
     document.addEventListener('contextmenu', preventAction);
@@ -74,96 +64,45 @@ const App: React.FC = () => {
     localStorage.setItem('al-hadiqa-interactions', JSON.stringify(interactions));
   }, [interactions]);
 
-  const getAIKeywords = useCallback(() => {
-    const history = localStorage.getItem('al-hadiqa-ai-history');
-    if (!history) return [];
+  const loadData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
-      const messages = JSON.parse(history);
-      return messages.filter((m: any) => m.role === 'user').map((m: any) => m.text).join(' ').toLowerCase().split(/\s+/).filter((w: string) => w.length > 3);
-    } catch (e) { return []; }
-  }, []);
-
-  const loadData = useCallback(async (mode: 'initial' | 'silent' | 'refresh' = 'initial') => {
-    if (mode === 'initial') setLoading(true);
-    if (mode === 'refresh') setRefreshing(true);
-
-    try {
-      // جلب كمية كبيرة لضمان وجود خيارات للتصفية
       const data = await fetchVideos(undefined, 300);
       if (data && data.length > 0) {
-        const filtered = data.filter(v => {
-          const vidId = v.id || v.video_url;
-          const isLiked = interactions.likedIds.includes(vidId);
-          const isDisliked = interactions.dislikedIds.includes(vidId);
-          const isSeenFull = interactions.watchHistory.some(h => h.id === vidId && h.progress > 0.95);
-          
-          // في وضع التحديث (Refresh)، نستبعد أي فيديو ظهر من قبل في هذه الجلسة
-          const isShownInSession = mode === 'refresh' ? sessionShownIds.has(vidId) : false;
-
-          return !isLiked && !isDisliked && !isSeenFull && !isShownInSession;
+        setRawVideos(prev => {
+          const prevIds = new Set(prev.map(v => v.id || v.video_url));
+          const newVideos = data.filter(v => !prevIds.has(v.id || v.video_url));
+          return [...newVideos, ...prev]; // دمج الجديد في الأعلى
         });
-
-        const shuffled = shuffleArray(filtered);
-
-        if (mode === 'refresh') {
-          // استبدال كامل للمحتوى بفيديوهات لم تظهر من قبل
-          setVideos(shuffled);
-          // إضافة المعروض حالياً لذاكرة الجلسة
-          setSessionShownIds(prev => {
-            const next = new Set(prev);
-            shuffled.forEach(v => next.add(v.id || v.video_url));
-            return next;
-          });
-        } else {
-          // في الوضع العادي أو الصامت، نقوم بدمج الجديد فقط
-          setVideos(prev => {
-            const prevIds = new Set(prev.map(v => v.id || v.video_url));
-            const newVideos = shuffled.filter(v => !prevIds.has(v.id || v.video_url));
-            
-            // تحديث ذاكرة الجلسة
-            if (newVideos.length > 0) {
-              setSessionShownIds(p => {
-                const n = new Set(p);
-                newVideos.forEach(v => n.add(v.id || v.video_url));
-                return n;
-              });
-            }
-
-            return [...newVideos, ...prev];
-          });
-        }
-        
-        shuffled.slice(0, 15).forEach(v => preloadVideoFile(v.video_url));
       }
     } catch (err) {
-      console.error("Load Error:", err);
+      console.error("Fetch Error:", err);
     } finally {
       setLoading(false);
       setRefreshing(false);
       setPullDistance(0);
     }
-  }, [interactions, sessionShownIds]);
+  }, []);
 
-  // التحديث التلقائي المستمر كل 15 ثانية
+  // تحديث مستمر كل 15 ثانية لجلب الجديد من المستودع
   useEffect(() => {
-    loadData('initial');
-    const interval = setInterval(() => {
-      if (!selectedShort && !selectedLong && currentView === AppView.HOME) {
-        loadData('silent');
-      }
-    }, 15000);
+    loadData();
+    const interval = setInterval(() => loadData(true), 15000);
     return () => clearInterval(interval);
-  }, [loadData, selectedShort, selectedLong, currentView]);
+  }, [loadData]);
 
-  const handlePlayShort = (video: Video, list: Video[]) => {
-    const keywords = getAIKeywords();
-    const sortedList = [...list].sort((a, b) => {
-      const scoreA = keywords.reduce((acc, kw) => acc + (a.title?.toLowerCase().includes(kw) ? 10 : 0), 0);
-      const scoreB = keywords.reduce((acc, kw) => acc + (b.title?.toLowerCase().includes(kw) ? 10 : 0), 0);
-      return scoreB - scoreA;
+  // تصفية الفيديوهات للواجهة الرئيسية (HOME)
+  const homeVideos = useMemo(() => {
+    const filtered = rawVideos.filter(v => {
+      const vidId = v.id || v.video_url;
+      const isLiked = interactions.likedIds.includes(vidId);
+      const isDisliked = interactions.dislikedIds.includes(vidId);
+      const isSeenFull = interactions.watchHistory.some(h => h.id === vidId && h.progress > 0.95);
+      return !isLiked && !isDisliked && !isSeenFull;
     });
-    setSelectedShort({ video, list: sortedList });
-  };
+    // إعادة الترتيب عند السحب للأسفل
+    return sessionNonce > 0 ? shuffleArray(filtered) : filtered;
+  }, [rawVideos, interactions, sessionNonce]);
 
   const handleToggleLike = async (id: string) => {
     const isLiked = interactions.likedIds.includes(id);
@@ -183,13 +122,6 @@ const App: React.FC = () => {
     }));
   };
 
-  const handleToggleSave = (id: string) => {
-    setInteractions(prev => {
-      const isSaved = prev.savedIds.includes(id);
-      return { ...prev, savedIds: isSaved ? prev.savedIds.filter(v => v !== id) : [...prev.savedIds, id] };
-    });
-  };
-
   const updateWatchHistory = (id: string, progress: number) => {
     setInteractions(prev => {
       const history = [...prev.watchHistory];
@@ -201,29 +133,28 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    const allAvailable = videos;
     switch (currentView) {
       case AppView.TREND:
-        return <TrendPage onPlayShort={handlePlayShort} onPlayLong={(v) => setSelectedLong({ video: v, list: allAvailable.filter(vid => vid.type === 'long'), autoNext: true })} excludedIds={interactions.dislikedIds} />;
+        return <TrendPage onPlayShort={(v, list) => setSelectedShort({ video: v, list })} onPlayLong={(v) => setSelectedLong({ video: v, list: rawVideos.filter(vid => vid.type === 'long'), autoNext: true })} excludedIds={interactions.dislikedIds} />;
       case AppView.SAVED:
-        return <SavedPage savedIds={interactions.savedIds} allVideos={allAvailable} onPlayShort={handlePlayShort} onPlayLong={(v) => setSelectedLong({ video: v, list: allAvailable.filter(v => interactions.savedIds.includes(v.id || v.video_url)), autoNext: true })} />;
+        return <SavedPage savedIds={interactions.savedIds} allVideos={rawVideos} onPlayShort={(v, list) => setSelectedShort({ video: v, list })} onPlayLong={(v) => setSelectedLong({ video: v, list: rawVideos.filter(vid => interactions.savedIds.includes(vid.id || vid.video_url)), autoNext: true })} />;
       case AppView.LIKES:
-        return <SavedPage savedIds={interactions.likedIds} allVideos={allAvailable} onPlayShort={handlePlayShort} onPlayLong={(v) => setSelectedLong({ video: v, list: allAvailable.filter(v => interactions.likedIds.includes(v.id || v.video_url)), autoNext: true })} title="الإعجابات" />;
+        return <SavedPage savedIds={interactions.likedIds} allVideos={rawVideos} onPlayShort={(v, list) => setSelectedShort({ video: v, list })} onPlayLong={(v) => setSelectedLong({ video: v, list: rawVideos.filter(vid => interactions.likedIds.includes(vid.id || vid.video_url)), autoNext: true })} title="الإعجابات" />;
       case AppView.UNWATCHED:
-        return <UnwatchedPage watchHistory={interactions.watchHistory} allVideos={allAvailable} onPlayShort={handlePlayShort} onPlayLong={(v) => setSelectedLong({ video: v, list: allAvailable.filter(vid => vid.type === 'long'), autoNext: true })} />;
+        return <UnwatchedPage watchHistory={interactions.watchHistory} allVideos={rawVideos} onPlayShort={(v, list) => setSelectedShort({ video: v, list })} onPlayLong={(v) => setSelectedLong({ video: v, list: rawVideos.filter(vid => vid.type === 'long'), autoNext: true })} />;
       case AppView.HIDDEN:
-        return <HiddenVideosPage interactions={interactions} allVideos={allAvailable} onRestore={handleToggleDislike} onPlayShort={handlePlayShort} onPlayLong={(v) => setSelectedLong({ video: v, list: [v], autoNext: false })} />;
+        return <HiddenVideosPage interactions={interactions} allVideos={rawVideos} onRestore={handleToggleDislike} onPlayShort={(v, list) => setSelectedShort({ video: v, list })} onPlayLong={(v) => setSelectedLong({ video: v, list: [v], autoNext: false })} />;
       case AppView.PRIVACY:
         return <PrivacyPage />;
       default:
         return (
           <MainContent 
-            videos={videos} 
+            videos={homeVideos} 
             interactions={interactions}
-            onPlayShort={handlePlayShort}
-            onPlayLong={(v, autoNext = false) => setSelectedLong({ video: v, list: allAvailable.filter(vid => vid.type === 'long'), autoNext })}
+            onPlayShort={(v, list) => setSelectedShort({ video: v, list })}
+            onPlayLong={(v, autoNext = false) => setSelectedLong({ video: v, list: rawVideos.filter(vid => vid.type === 'long'), autoNext })}
             onViewUnwatched={() => setCurrentView(AppView.UNWATCHED)}
-            loading={loading && videos.length === 0}
+            loading={loading && rawVideos.length === 0}
           />
         );
     }
@@ -235,17 +166,20 @@ const App: React.FC = () => {
       onTouchStart={(e) => { if (window.scrollY === 0) touchStart.current = e.touches[0].clientY; }}
       onTouchMove={(e) => {
         if (window.scrollY === 0 && touchStart.current > 0) {
-          const currentY = e.touches[0].clientY;
-          const diff = currentY - touchStart.current;
+          const diff = e.touches[0].clientY - touchStart.current;
           if (diff > 0) setPullDistance(Math.min(diff / 2, 80));
         }
       }}
       onTouchEnd={() => {
-        if (pullDistance > 60) { loadData('refresh'); } else setPullDistance(0);
+        if (pullDistance > 60) {
+          setRefreshing(true);
+          setSessionNonce(prev => prev + 1);
+          loadData();
+        } else setPullDistance(0);
         touchStart.current = 0;
       }}
     >
-      <AppBar onViewChange={setCurrentView} onRefresh={() => loadData('refresh')} currentView={currentView} />
+      <AppBar onViewChange={setCurrentView} onRefresh={() => { setSessionNonce(n => n+1); loadData(); }} currentView={currentView} />
       
       <div className="fixed left-0 right-0 z-40 flex justify-center transition-all pointer-events-none" style={{ top: `${pullDistance + 10}px`, opacity: pullDistance / 60 }}>
         <div className={`p-2 bg-red-600 rounded-full shadow-lg ${refreshing ? 'animate-spin' : ''}`}>
@@ -264,7 +198,7 @@ const App: React.FC = () => {
           onClose={() => setSelectedShort(null)} 
           onLike={handleToggleLike} 
           onDislike={handleToggleDislike} 
-          onSave={handleToggleSave} 
+          onSave={(id) => setInteractions(prev => ({ ...prev, savedIds: prev.savedIds.includes(id) ? prev.savedIds.filter(v => v !== id) : [...prev.savedIds, id] }))} 
           onProgress={updateWatchHistory}
           onAllEnded={() => setSelectedShort(null)}
         />
@@ -276,7 +210,10 @@ const App: React.FC = () => {
           onClose={() => setSelectedLong(null)}
           onLike={() => handleToggleLike(selectedLong.video.id || selectedLong.video.video_url)}
           onDislike={() => handleToggleDislike(selectedLong.video.id || selectedLong.video.video_url)}
-          onSave={() => handleToggleSave(selectedLong.video.id || selectedLong.video.video_url)}
+          onSave={() => setInteractions(prev => {
+            const id = selectedLong.video.id || selectedLong.video.video_url;
+            return { ...prev, savedIds: prev.savedIds.includes(id) ? prev.savedIds.filter(v => v !== id) : [...prev.savedIds, id] };
+          })}
           onNext={() => {}} 
           onPrev={() => {}} 
           isLiked={interactions.likedIds.includes(selectedLong.video.id || selectedLong.video.video_url)}
