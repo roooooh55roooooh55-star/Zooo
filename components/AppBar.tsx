@@ -9,7 +9,33 @@ interface AppBarProps {
 }
 
 const AppBar: React.FC<AppBarProps> = ({ onViewChange, onRefresh, currentView }) => {
-  const youtubeUrl = 'https://youtube.com/channel/UCDc_3d066uDWC3ljZTccKUg?si=spOUUwvDeudYtwEr';
+  const channelId = 'UCDc_3d066uDWC3ljZTccKUg';
+  const youtubeWebUrl = `https://www.youtube.com/channel/${channelId}?si=spOUUwvDeudYtwEr`;
+
+  const handleYouTubeClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isAndroid) {
+      // محاولة فتح التطبيق مباشرة في أندرويد باستخدام Intent
+      const intentUrl = `intent://www.youtube.com/channel/${channelId}#Intent;package=com.google.android.youtube;scheme=https;end`;
+      window.location.href = intentUrl;
+    } else if (isIOS) {
+      // محاولة فتح البروتوكول المخصص لـ iOS
+      const appUrl = `youtube://www.youtube.com/channel/${channelId}`;
+      window.location.href = appUrl;
+      
+      // التوجه للمتصفح كبديل بعد فترة قصيرة إذا لم يفتح التطبيق
+      setTimeout(() => {
+        window.open(youtubeWebUrl, '_blank');
+      }, 500);
+    } else {
+      // أجهزة الكمبيوتر تفتح المتصفح كالمعتاد
+      window.open(youtubeWebUrl, '_blank');
+    }
+  };
 
   return (
     <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-[#0f0f0f]/95 backdrop-blur-md z-50 border-b border-white/10 px-4 py-2 flex items-center justify-between shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
@@ -53,9 +79,12 @@ const AppBar: React.FC<AppBarProps> = ({ onViewChange, onRefresh, currentView })
           <svg className="w-5 h-5" fill={currentView === AppView.SAVED ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
         </button>
 
-        <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" className="p-2.5 rounded-xl border border-red-600/20 bg-red-600/5 text-red-600 shadow-[0_0_10px_rgba(220,38,38,0.2)]">
+        <button 
+          onClick={handleYouTubeClick}
+          className="p-2.5 rounded-xl border border-red-600/20 bg-red-600/5 text-red-600 shadow-[0_0_10px_rgba(220,38,38,0.2)] active:scale-95 transition-transform"
+        >
           <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 4-8 4z"/></svg>
-        </a>
+        </button>
 
         <button 
           onClick={() => onViewChange(AppView.PRIVACY)}
