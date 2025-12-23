@@ -64,7 +64,19 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
           });
         }
       }
+
+      // تحميل مسبق للفيديو التالي لضمان تجربة فورية
+      const nextIndex = currentIndex + 1;
+      if (nextIndex < videoList.length) {
+        const nextVideoUrl = videoList[nextIndex].video_url;
+        const link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'video';
+        link.href = nextVideoUrl;
+        document.head.appendChild(link);
+      }
     }
+    
     Object.keys(videoRefs.current).forEach((key) => {
       const idx = parseInt(key);
       const vid = videoRefs.current[idx];
@@ -108,7 +120,7 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
           const isSaved = interactions.savedIds.includes(videoId);
 
           return (
-            <div key={`${videoId}-${idx}`} className="h-full w-full snap-start relative bg-black flex items-center justify-center overflow-hidden fluo-portal">
+            <div key={`${videoId}-${idx}`} className="h-full w-full snap-start relative bg-black flex items-center justify-center overflow-hidden">
               <video 
                 ref={el => { videoRefs.current[idx] = el; }}
                 src={video.video_url} 

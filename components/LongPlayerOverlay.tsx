@@ -92,7 +92,7 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
     <div className="fixed inset-0 bg-black z-[200] flex flex-col transition-all duration-500 overflow-hidden">
       <div 
         ref={containerRef}
-        className={`relative bg-black flex items-center justify-center transition-all duration-500 cursor-pointer overflow-hidden fluo-portal ${
+        className={`relative bg-black flex items-center justify-center transition-all duration-500 cursor-pointer overflow-hidden ${
           isLandscape ? 'fixed inset-0 z-[300] w-screen h-screen' : 'flex-grow'
         }`}
         onClick={handleInteraction}
@@ -112,6 +112,7 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
           } : {}}
           className={`transition-all duration-500 pointer-events-none relative z-10 ${!isLandscape ? 'w-full aspect-video object-contain shadow-[0_0_50px_rgba(0,0,0,1)]' : ''}`}
           playsInline
+          preload="auto"
         />
 
         {/* أزرار التحكم العلوية */}

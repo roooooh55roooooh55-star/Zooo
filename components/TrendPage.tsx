@@ -51,12 +51,12 @@ const TrendPage: React.FC<TrendPageProps> = ({ onPlayShort, onPlayLong, excluded
             <div 
               key={video.id || video.video_url}
               onClick={() => video.type === 'short' ? onPlayShort(video, filteredTrends.filter(v => v.type === 'short')) : onPlayLong(video)}
-              className="group relative bg-[#1a1a1a]/50 border border-white/5 rounded-[2.5rem] overflow-hidden cursor-pointer shadow-2xl transition-all active:scale-[0.97] fluo-portal"
+              className="group relative bg-[#1a1a1a]/50 border border-white/5 rounded-[2.5rem] overflow-hidden cursor-pointer shadow-2xl transition-all active:scale-[0.97]"
             >
               <div className="aspect-video relative bg-black overflow-hidden">
                 <video 
                   src={video.video_url} 
-                  muted autoPlay loop playsInline 
+                  muted autoPlay loop playsInline preload="auto"
                   className="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-[3s] relative z-10" 
                   onTimeUpdate={(e) => {
                     if (e.currentTarget.currentTime >= 5) e.currentTarget.currentTime = 0;

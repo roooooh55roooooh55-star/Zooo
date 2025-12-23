@@ -57,8 +57,8 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
   }, [video.video_url]);
 
   return (
-    <div onClick={onClick} className={`relative overflow-hidden cursor-pointer group bg-neutral-900 border border-white/5 transition-all active:scale-95 fluo-portal ${className}`}>
-      <video ref={videoRef} src={video.video_url} muted autoPlay loop playsInline className="w-full h-full object-cover transition-transform group-hover:scale-110 relative z-10" />
+    <div onClick={onClick} className={`relative overflow-hidden cursor-pointer group bg-neutral-900 border border-white/5 transition-all active:scale-95 ${className}`}>
+      <video ref={videoRef} src={video.video_url} muted autoPlay loop playsInline preload="auto" className="w-full h-full object-cover transition-transform group-hover:scale-110 relative z-10" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent p-3 flex flex-col justify-end z-20">
         <p className="text-[10px] font-bold text-white line-clamp-2 text-right">{video.title || "الحديقة المرعبة"}</p>
         <div className="flex items-center justify-between mt-1">
@@ -138,10 +138,10 @@ const DraggableMarquee: React.FC<DraggableMarqueeProps> = ({ videos, onPlay }) =
           onClick={() => onPlay(video)}
           className="flex-shrink-0 w-64 pointer-events-auto"
         >
-          <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-xl mb-2 aspect-video bg-black fluo-portal">
+          <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-xl mb-2 aspect-video bg-black">
             <video 
               src={video.video_url} 
-              muted loop playsInline autoPlay 
+              muted loop playsInline autoPlay preload="auto"
               className="w-full h-full object-cover opacity-80 pointer-events-none relative z-10" 
               onTimeUpdate={(e) => {
                 if (e.currentTarget.currentTime >= 5) e.currentTarget.currentTime = 0;
@@ -246,11 +246,11 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </div>
         <div className="flex flex-col gap-6">
           {availableLongs.map((video) => (
-             <div key={video.id || video.video_url} onClick={() => onPlayLong(video, true)} className="bg-neutral-900/40 rounded-[2.5rem] border border-white/5 overflow-hidden active:scale-[0.98] transition-all shadow-2xl fluo-portal">
+             <div key={video.id || video.video_url} onClick={() => onPlayLong(video, true)} className="bg-neutral-900/40 rounded-[2.5rem] border border-white/5 overflow-hidden active:scale-[0.98] transition-all shadow-2xl">
               <div className="relative aspect-video w-full bg-black">
                 <video 
                   src={video.video_url} 
-                  muted autoPlay loop playsInline 
+                  muted autoPlay loop playsInline preload="auto"
                   className="w-full h-full object-cover relative z-10" 
                   onTimeUpdate={(e) => {
                     if (e.currentTarget.currentTime >= 5) e.currentTarget.currentTime = 0;

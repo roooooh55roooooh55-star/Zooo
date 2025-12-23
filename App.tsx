@@ -22,6 +22,15 @@ const shuffleArray = (array: any[]) => {
   return shuffled;
 };
 
+// وظيفة للتحميل المسبق في ذاكرة المتصفح
+const preloadVideoFile = (url: string) => {
+  const link = document.createElement('link');
+  link.rel = 'preload';
+  link.as = 'video';
+  link.href = url;
+  document.head.appendChild(link);
+};
+
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.HOME);
   const [videos, setVideos] = useState<Video[]>([]);
@@ -47,7 +56,10 @@ const App: React.FC = () => {
     try {
       const data = await fetchVideos(undefined, 100);
       if (data && data.length > 0) {
-        setVideos(shuffleArray(data));
+        const shuffled = shuffleArray(data);
+        setVideos(shuffled);
+        // تحميل مسبق لأول 5 فيديوهات لضمان تشغيل فوري
+        shuffled.slice(0, 5).forEach(v => preloadVideoFile(v.video_url));
       }
     } catch (err) {
       console.error("Data load error", err);
