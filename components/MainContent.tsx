@@ -18,13 +18,12 @@ const formatBigNumber = (num: number) => {
   return num.toString();
 };
 
-// التحقق مما إذا كان الفيديو "جديداً" (مضاف خلال آخر 48 ساعة)
 const isRecentVideo = (video: Video) => {
   if (!video.created_at) return false;
   const videoDate = new Date(video.created_at).getTime();
   const now = new Date().getTime();
   const diffHours = (now - videoDate) / (1000 * 60 * 60);
-  return diffHours < 48;
+  return diffHours < 48; // أي فيديو أضيف في آخر يومين يعتبر جديداً
 };
 
 interface VideoPreviewProps {
@@ -42,23 +41,8 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
   useEffect(() => { 
     const v = videoRef.current;
     if (!v) return;
-    
-    const playVideo = () => {
-      const playPromise = v.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(() => {
-          // تجاهل الأخطاء الناتجة عن التغيير السريع في DOM
-        });
-      }
-    };
-
-    playVideo();
-    
-    const handleTimeUpdate = () => {
-      if (v.currentTime >= 5) {
-        v.currentTime = 0;
-      }
-    };
+    v.play().catch(() => {});
+    const handleTimeUpdate = () => { if (v.currentTime >= 5) v.currentTime = 0; };
     v.addEventListener('timeupdate', handleTimeUpdate);
     return () => {
       v.removeEventListener('timeupdate', handleTimeUpdate);
@@ -67,12 +51,11 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
   }, [video.video_url]);
 
   return (
-    <div onClick={onClick} className={`relative overflow-hidden cursor-pointer group bg-neutral-900 border border-white/5 transition-all active:scale-95 ${className}`}>
+    <div onClick={onClick} className={`relative overflow-hidden cursor-pointer group bg-neutral-900 border border-white/5 transition-all active:scale-95 animate-in fade-in zoom-in duration-500 ${className}`}>
       <video ref={videoRef} src={video.video_url} muted autoPlay loop playsInline preload="auto" className="w-full h-full object-cover transition-transform group-hover:scale-110 relative z-10" />
       
-      {/* ملصق "جديد" احترافي */}
       {isNew && (
-        <div className="absolute top-2 right-2 z-30 bg-red-600 text-white text-[8px] font-black px-2 py-0.5 rounded-full shadow-[0_0_10px_rgba(220,38,38,0.8)] border border-red-400 animate-pulse">
+        <div className="absolute top-2 right-2 z-30 bg-red-600 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full shadow-[0_0_15px_rgba(220,38,38,1)] border border-red-400 animate-pulse">
           جديد
         </div>
       )}
@@ -106,7 +89,6 @@ const DraggableMarquee: React.FC<DraggableMarqueeProps> = ({ videos, onPlay }) =
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isInteracting, setIsInteracting] = useState(false);
   const animationRef = useRef<number>(0);
-  const interactionTimer = useRef<any>(null);
 
   const displayVideos = useMemo(() => {
     const map = new Map();
@@ -117,8 +99,7 @@ const DraggableMarquee: React.FC<DraggableMarqueeProps> = ({ videos, onPlay }) =
   const step = () => {
     if (!isInteracting && scrollRef.current && displayVideos.length > 1) {
       scrollRef.current.scrollLeft -= 0.6;
-      const maxScroll = scrollRef.current.scrollWidth - scrollRef.current.clientWidth;
-      if (Math.abs(scrollRef.current.scrollLeft) >= maxScroll) {
+      if (Math.abs(scrollRef.current.scrollLeft) >= (scrollRef.current.scrollWidth - scrollRef.current.clientWidth)) {
          scrollRef.current.scrollLeft = 0;
       }
     }
@@ -130,45 +111,18 @@ const DraggableMarquee: React.FC<DraggableMarqueeProps> = ({ videos, onPlay }) =
     return () => cancelAnimationFrame(animationRef.current);
   }, [isInteracting, displayVideos]);
 
-  const handleInteractionStart = () => {
-    setIsInteracting(true);
-    if (interactionTimer.current) clearTimeout(interactionTimer.current);
-  };
-
-  const handleInteractionEnd = () => {
-    interactionTimer.current = setTimeout(() => {
-      setIsInteracting(false);
-    }, 2000);
-  };
-
   return (
     <div 
       ref={scrollRef}
       className="flex gap-4 overflow-x-auto scrollbar-hide select-none cursor-grab active:cursor-grabbing px-4 pb-4"
-      onPointerDown={handleInteractionStart}
-      onPointerUp={handleInteractionEnd}
-      onPointerLeave={handleInteractionEnd}
+      onPointerDown={() => setIsInteracting(true)}
+      onPointerUp={() => setTimeout(() => setIsInteracting(false), 2000)}
       style={{ direction: 'rtl' }}
     >
       {displayVideos.map((video, i) => (
-        <div 
-          key={`${video.id || video.video_url}-${i}`} 
-          onClick={() => onPlay(video)}
-          className="flex-shrink-0 w-64 pointer-events-auto"
-        >
+        <div key={`${video.id || video.video_url}-${i}`} onClick={() => onPlay(video)} className="flex-shrink-0 w-64">
           <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-xl mb-2 aspect-video bg-black">
-            <video 
-              src={video.video_url} 
-              muted loop playsInline autoPlay preload="auto"
-              className="w-full h-full object-cover opacity-80 pointer-events-none relative z-10" 
-              onTimeUpdate={(e) => {
-                if (e.currentTarget.currentTime >= 5) e.currentTarget.currentTime = 0;
-              }}
-              onLoadedMetadata={(e) => {
-                const playPromise = e.currentTarget.play();
-                if (playPromise !== undefined) playPromise.catch(() => {});
-              }}
-            />
+            <video src={video.video_url} muted loop playsInline autoPlay className="w-full h-full object-cover opacity-80 pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-full h-1 bg-white/10 z-20">
               <div className="h-full bg-yellow-500 shadow-[0_0_5px_rgba(234,179,8,1)]" style={{ width: `${video.progress * 100}%` }}></div>
             </div>
@@ -201,16 +155,8 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
     return Array.from(uniqueMap.values()).reverse() as (Video & { progress: number })[];
   }, [videos, interactions.watchHistory]);
 
-  const dislikedIds = useMemo(() => new Set(interactions.dislikedIds), [interactions.dislikedIds]);
-
-  // استخراج الفيديوهات وتقسيمها لمجموعات بناءً على الطلب:
-  // 1. 4 شورتس
-  // 2. مكمل رعب (إذا وجد)
-  // 3. 4 فيديوهات طويلة
-  // 4. 4 شورتس إضافية
-  // 5. 4 فيديوهات طويلة إضافية
-  const allShorts = useMemo(() => videos.filter(v => v.type === 'short' && !dislikedIds.has(v.id || v.video_url)), [videos, dislikedIds]);
-  const allLongs = useMemo(() => videos.filter(v => v.type === 'long' && !dislikedIds.has(v.id || v.video_url)), [videos, dislikedIds]);
+  const allShorts = useMemo(() => videos.filter(v => v.type === 'short'), [videos]);
+  const allLongs = useMemo(() => videos.filter(v => v.type === 'long'), [videos]);
 
   const shortGroups = [allShorts.slice(0, 4), allShorts.slice(4, 8)];
   const longGroups = [allLongs.slice(0, 4), allLongs.slice(4, 8)];
@@ -219,14 +165,13 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
     return (
       <div className="flex flex-col items-center justify-center p-20 min-h-[60vh]">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-gray-400 font-bold animate-pulse text-center text-sm">تفتح أبواب الحديقة...</p>
+        <p className="text-gray-400 font-bold animate-pulse text-center text-sm italic">نستكشف أسرار الحديقة...</p>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-2 pb-32">
-      {/* 1. المجموعة الأولى من الشورتس */}
       <section className="mt-2">
         <div className="flex items-center gap-3 mb-4 px-1">
           <div className="relative">
@@ -243,7 +188,6 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </div>
       </section>
 
-      {/* 2. قسم مكمل رعب */}
       {unwatchedVideos.length > 0 && (
         <section className="mt-8">
           <div className="flex items-center justify-between mb-4 px-1">
@@ -257,7 +201,6 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </section>
       )}
 
-      {/* 3. المجموعة الأولى من الفيديوهات الطويلة */}
       <section className="mt-8">
         <div className="flex items-center gap-2 mb-6 px-1">
           <div className="w-1.5 h-6 bg-green-500 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.3)]"></div>
@@ -267,33 +210,19 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
           {longGroups[0].map((video) => (
              <div key={video.id || video.video_url} onClick={() => onPlayLong(video, true)} className="bg-neutral-900/40 rounded-[2.5rem] border border-white/5 overflow-hidden active:scale-[0.98] transition-all shadow-2xl">
               <div className="relative aspect-video w-full bg-black">
-                <video src={video.video_url} muted autoPlay loop playsInline preload="auto" className="w-full h-full object-cover relative z-10" />
-                
-                {/* ملصق "جديد" احترافي للطويل */}
+                <video src={video.video_url} muted autoPlay loop playsInline className="w-full h-full object-cover relative z-10" />
                 {isRecentVideo(video) && (
                    <div className="absolute top-5 left-5 bg-red-600/90 backdrop-blur-lg text-[10px] px-3 py-1 rounded-full font-black text-white shadow-xl z-20 border border-red-400">جديد</div>
                 )}
               </div>
               <div className="p-6 flex items-center justify-between z-20 bg-[#0f0f0f]/80 backdrop-blur-sm">
                 <h3 className="text-base font-bold line-clamp-1 text-right">{video.title}</h3>
-                <div className="flex items-center gap-4 text-[11px] font-black">
-                   {(() => {
-                      const stats = getDeterministicStats(video.video_url);
-                      return (
-                        <>
-                          <span className="flex items-center gap-1.5 text-red-500"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>{formatBigNumber(stats.likes)}</span>
-                          <span className="flex items-center gap-1.5 text-blue-400"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>{formatBigNumber(stats.views)}</span>
-                        </>
-                      );
-                   })()}
-                </div>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* 4. المجموعة الثانية من الشورتس */}
       {shortGroups[1].length > 0 && (
         <section className="mt-12">
           <div className="flex items-center gap-2 mb-6 px-1">
@@ -308,7 +237,6 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </section>
       )}
 
-      {/* 5. المجموعة الثانية من الفيديوهات الطويلة */}
       {longGroups[1].length > 0 && (
         <section className="mt-12">
           <div className="flex items-center gap-2 mb-6 px-1">
@@ -319,7 +247,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
             {longGroups[1].map((video) => (
                <div key={video.id || video.video_url} onClick={() => onPlayLong(video, true)} className="bg-neutral-900/40 rounded-[2.5rem] border border-white/5 overflow-hidden active:scale-[0.98] transition-all shadow-2xl">
                 <div className="relative aspect-video w-full bg-black">
-                  <video src={video.video_url} muted autoPlay loop playsInline preload="auto" className="w-full h-full object-cover relative z-10" />
+                  <video src={video.video_url} muted autoPlay loop playsInline className="w-full h-full object-cover relative z-10" />
                   {isRecentVideo(video) && (
                    <div className="absolute top-5 left-5 bg-red-600/90 backdrop-blur-lg text-[10px] px-3 py-1 rounded-full font-black text-white shadow-xl z-20 border border-red-400">جديد</div>
                   )}
