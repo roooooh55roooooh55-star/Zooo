@@ -32,7 +32,7 @@ const LiveThumbnail: React.FC<{ url: string, isShort: boolean }> = ({ url, isSho
   return (
     <video 
       ref={videoRef} src={url} muted loop playsInline autoPlay 
-      className={`w-full h-full object-cover transition-transform group-hover:scale-105 ${isShort ? 'aspect-[9/16]' : 'aspect-video'}`} 
+      className={`w-full h-full object-cover transition-transform group-hover:scale-105 relative z-10 ${isShort ? 'aspect-[9/16]' : 'aspect-video'}`} 
     />
   );
 };
@@ -83,9 +83,9 @@ const SavedPage: React.FC<SavedPageProps> = ({ savedIds, allVideos, onPlayShort,
             onClick={() => video.type === 'short' ? onPlayShort(video, savedVideos.filter(v => v.type === 'short')) : onPlayLong(video)}
             className="flex flex-col gap-2 cursor-pointer group"
           >
-            <div className={`relative rounded-2xl overflow-hidden border border-white/10 shadow-lg ${video.type === 'short' ? 'aspect-[9/16]' : 'aspect-video'}`}>
+            <div className={`relative rounded-2xl overflow-hidden border border-white/10 shadow-lg fluo-portal ${video.type === 'short' ? 'aspect-[9/16]' : 'aspect-video'}`}>
               <LiveThumbnail url={video.video_url} isShort={video.type === 'short'} />
-              <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-sm px-2 py-0.5 rounded text-[8px] text-white font-black border border-white/10">
+              <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-sm px-2 py-0.5 rounded text-[8px] text-white font-black border border-white/10 z-20">
                 {video.type === 'short' ? 'SHORT' : 'LIVE'}
               </div>
             </div>

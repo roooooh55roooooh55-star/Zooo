@@ -92,7 +92,7 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
     <div className="fixed inset-0 bg-black z-[200] flex flex-col transition-all duration-500 overflow-hidden">
       <div 
         ref={containerRef}
-        className={`relative bg-black flex items-center justify-center transition-all duration-500 cursor-pointer overflow-hidden ${
+        className={`relative bg-black flex items-center justify-center transition-all duration-500 cursor-pointer overflow-hidden fluo-portal ${
           isLandscape ? 'fixed inset-0 z-[300] w-screen h-screen' : 'flex-grow'
         }`}
         onClick={handleInteraction}
@@ -110,7 +110,7 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
             objectFit: 'cover', 
             backgroundColor: 'black'
           } : {}}
-          className={`transition-all duration-500 pointer-events-none ${!isLandscape ? 'w-full aspect-video object-contain shadow-[0_0_50px_rgba(0,0,0,1)]' : ''}`}
+          className={`transition-all duration-500 pointer-events-none relative z-10 ${!isLandscape ? 'w-full aspect-video object-contain shadow-[0_0_50px_rgba(0,0,0,1)]' : ''}`}
           playsInline
         />
 
@@ -140,7 +140,7 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
       </div>
 
       {!isLandscape && (
-        <div className={`p-6 pb-28 bg-[#0a0a0a] rounded-t-[2.5rem] border-t border-white/5 flex flex-col gap-6 transition-all duration-500 shadow-[0_-20px_50px_rgba(0,0,0,0.9)] ${showControls ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'}`}>
+        <div className={`p-6 pb-28 bg-[#0a0a0a] rounded-t-[2.5rem] border-t border-white/5 flex flex-col gap-6 transition-all duration-500 shadow-[0_-20px_50px_rgba(0,0,0,0.9)] z-[350] ${showControls ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'}`}>
           <div className="flex items-center justify-between">
             <button onClick={toggleLandscape} className="p-2.5 bg-red-600/10 border border-red-500 text-red-500 rounded-xl flex items-center gap-2 active:scale-95 transition-transform shadow-[0_0_15px_rgba(220,38,38,0.3)]">
                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>

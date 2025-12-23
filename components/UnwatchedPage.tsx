@@ -29,9 +29,9 @@ const LiveThumbnail: React.FC<{ url: string, isShort: boolean, progress: number 
   }, [url]);
 
   return (
-    <div className="relative w-full h-full">
-      <video ref={videoRef} src={url} muted loop playsInline autoPlay className="w-full h-full object-cover opacity-80" />
-      <div className="absolute bottom-0 left-0 w-full h-1 bg-white/10">
+    <div className="relative w-full h-full fluo-portal">
+      <video ref={videoRef} src={url} muted loop playsInline autoPlay className="w-full h-full object-cover opacity-80 relative z-10" />
+      <div className="absolute bottom-0 left-0 w-full h-1 bg-white/10 z-20">
          <div className="h-full bg-red-600 shadow-[0_0_8px_red]" style={{ width: `${progress * 100}%` }}></div>
       </div>
     </div>
@@ -87,7 +87,7 @@ const UnwatchedPage: React.FC<UnwatchedPageProps> = ({ watchHistory, allVideos, 
             >
               <div className={`relative rounded-3xl overflow-hidden border border-white/10 shadow-xl ${video.type === 'short' ? 'aspect-[9/16]' : 'aspect-video'}`}>
                 <LiveThumbnail url={video.video_url} isShort={video.type === 'short'} progress={progress} />
-                <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[8px] text-white font-black border border-white/10">
+                <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[8px] text-white font-black border border-white/10 z-20">
                   {Math.round(progress * 100)}%
                 </div>
               </div>

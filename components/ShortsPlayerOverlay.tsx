@@ -108,11 +108,11 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
           const isSaved = interactions.savedIds.includes(videoId);
 
           return (
-            <div key={`${videoId}-${idx}`} className="h-full w-full snap-start relative bg-black flex items-center justify-center overflow-hidden">
+            <div key={`${videoId}-${idx}`} className="h-full w-full snap-start relative bg-black flex items-center justify-center overflow-hidden fluo-portal">
               <video 
                 ref={el => { videoRefs.current[idx] = el; }}
                 src={video.video_url} 
-                className="h-full w-full object-cover"
+                className="h-full w-full object-cover relative z-10"
                 playsInline preload="auto"
                 muted={idx !== currentIndex || isMuted}
                 onEnded={idx === currentIndex ? handleVideoEnded : undefined}
@@ -127,7 +127,7 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
                   }
                 }}
               />
-              <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/90 pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/90 pointer-events-none z-20" />
 
               <div className="absolute bottom-24 left-6 flex flex-col items-center gap-5 z-30">
                 <button 

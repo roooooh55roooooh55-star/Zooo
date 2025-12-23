@@ -51,25 +51,25 @@ const TrendPage: React.FC<TrendPageProps> = ({ onPlayShort, onPlayLong, excluded
             <div 
               key={video.id || video.video_url}
               onClick={() => video.type === 'short' ? onPlayShort(video, filteredTrends.filter(v => v.type === 'short')) : onPlayLong(video)}
-              className="group relative bg-[#1a1a1a]/50 border border-white/5 rounded-[2.5rem] overflow-hidden cursor-pointer shadow-2xl transition-all active:scale-[0.97]"
+              className="group relative bg-[#1a1a1a]/50 border border-white/5 rounded-[2.5rem] overflow-hidden cursor-pointer shadow-2xl transition-all active:scale-[0.97] fluo-portal"
             >
               <div className="aspect-video relative bg-black overflow-hidden">
                 <video 
                   src={video.video_url} 
                   muted autoPlay loop playsInline 
-                  className="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-[3s]" 
+                  className="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-[3s] relative z-10" 
                   onTimeUpdate={(e) => {
                     if (e.currentTarget.currentTime >= 5) e.currentTarget.currentTime = 0;
                   }}
                 />
-                <div className="absolute top-5 right-5 bg-red-600 text-white text-sm font-black w-10 h-10 flex items-center justify-center rounded-2xl shadow-xl ring-2 ring-red-400/20">
+                <div className="absolute top-5 right-5 bg-red-600 text-white text-sm font-black w-10 h-10 flex items-center justify-center rounded-2xl shadow-xl ring-2 ring-red-400/20 z-20">
                   {idx + 1}
                 </div>
-                <div className="absolute top-5 left-5 bg-black/60 backdrop-blur-md px-4 py-1.5 rounded-full text-[10px] text-white border border-white/10 font-black uppercase tracking-widest">
+                <div className="absolute top-5 left-5 bg-black/60 backdrop-blur-md px-4 py-1.5 rounded-full text-[10px] text-white border border-white/10 font-black uppercase tracking-widest z-20">
                   {video.type === 'short' ? 'Short' : 'Viral'}
                 </div>
               </div>
-              <div className="p-7 flex flex-col gap-4">
+              <div className="p-7 flex flex-col gap-4 relative z-20 bg-[#0f0f0f]/60 backdrop-blur-sm">
                 <h3 className="font-black text-xl line-clamp-1 leading-tight tracking-tight text-right">{video.title}</h3>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-5">
