@@ -17,6 +17,13 @@
         -webkit-overflow-scrolling: touch;
         margin: 0;
         padding: 0;
+        /* منع تحديد النص في كامل التطبيق */
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        /* منع ظهور القوائم في iOS عند الضغط المطول */
+        -webkit-touch-callout: none;
       }
       html {
         overscroll-behavior: none;
@@ -30,6 +37,14 @@
         -webkit-tap-highlight-color: transparent;
         box-sizing: border-box;
       }
+      
+      /* منع التصوير عبر لقطات الشاشة أو الطباعة في المتصفحات المدعومة */
+      @media print {
+        body {
+          display: none !important;
+        }
+      }
+
       /* تأثير النيون العام للأزرار المحددة */
       .neon-glow-red { box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); border-color: rgba(239, 68, 68, 0.5); }
       .neon-glow-blue { box-shadow: 0 0 15px rgba(59, 130, 246, 0.5); border-color: rgba(59, 130, 246, 0.5); }

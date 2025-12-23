@@ -22,7 +22,6 @@ const shuffleArray = (array: any[]) => {
   return shuffled;
 };
 
-// وظيفة للتحميل المسبق في ذاكرة المتصفح
 const preloadVideoFile = (url: string) => {
   const link = document.createElement('link');
   link.rel = 'preload';
@@ -47,22 +46,82 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : { likedIds: [], dislikedIds: [], savedIds: [], watchHistory: [] };
   });
 
+  // --- نظام الحماية ضد النسخ والتصوير ---
+  useEffect(() => {
+    const preventAction = (e: Event) => e.preventDefault();
+    
+    // منع القائمة اليمنى والنسخ والقص
+    document.addEventListener('contextmenu', preventAction);
+    document.addEventListener('copy', preventAction);
+    document.addEventListener('cut', preventAction);
+    document.addEventListener('dragstart', preventAction);
+
+    // منع اختصارات لوحة المفاتيح الحساسة
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+C, Ctrl+V, Ctrl+U (عرض المصدر), Ctrl+S, Ctrl+P (طباعة)
+      // Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C (أدوات المطور)
+      if (
+        (e.ctrlKey || e.metaKey) && 
+        (e.key === 'c' || e.key === 'v' || e.key === 'u' || e.key === 's' || e.key === 'p' || e.key === 'a')
+      ) {
+        e.preventDefault();
+      }
+      // F12
+      if (e.key === 'F12') {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('contextmenu', preventAction);
+      document.removeEventListener('copy', preventAction);
+      document.removeEventListener('cut', preventAction);
+      document.removeEventListener('dragstart', preventAction);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+  // ---------------------------------------
+
   useEffect(() => {
     localStorage.setItem('al-hadiqa-interactions', JSON.stringify(interactions));
   }, [interactions]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const getAIKeywords = useCallback(() => {
+    const history = localStorage.getItem('al-hadiqa-ai-history');
+    if (!history) return [];
     try {
-      // جلب آخر 100 فيديو مضاف لضمان الحداثة
-      const data = await fetchVideos(undefined, 100);
+      const messages = JSON.parse(history);
+      const userText = messages
+        .filter((m: any) => m.role === 'user')
+        .map((m: any) => m.text)
+        .join(' ');
+      return userText.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3);
+    } catch (e) {
+      return [];
+    }
+  }, []);
+
+  const loadData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    try {
+      const data = await fetchVideos(undefined, 200);
       if (data && data.length > 0) {
-        // نخلطهم لضمان واجهة "حية" ومتغيرة دائماً للمستخدم
-        const shuffled = shuffleArray(data);
-        setVideos(shuffled);
+        const filtered = data.filter(v => {
+          const vidId = v.id || v.video_url;
+          const isLiked = interactions.likedIds.includes(vidId);
+          const isDisliked = interactions.dislikedIds.includes(vidId);
+          const isSeen = interactions.watchHistory.some(h => (h.id === vidId) && h.progress > 0.9);
+          return !isLiked && !isDisliked && !isSeen;
+        });
+
+        setVideos(prev => {
+          const prevIds = new Set(prev.map(v => v.id || v.video_url));
+          const newVideos = filtered.filter(v => !prevIds.has(v.id || v.video_url));
+          return [...newVideos, ...filtered.filter(v => prevIds.has(v.id || v.video_url))];
+        });
         
-        // تحميل مسبق مكثف (أول 10 فيديوهات) لضمان سرعة فائقة
-        shuffled.slice(0, 10).forEach(v => preloadVideoFile(v.video_url));
+        filtered.slice(0, 15).forEach(v => preloadVideoFile(v.video_url));
       }
     } catch (err) {
       console.error("Data load error", err);
@@ -71,36 +130,26 @@ const App: React.FC = () => {
       setRefreshing(false);
       setPullDistance(0);
     }
-  }, []);
+  }, [interactions.likedIds, interactions.dislikedIds, interactions.watchHistory]);
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (window.scrollY === 0) {
-      touchStart.current = e.touches[0].clientY;
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (window.scrollY === 0 && touchStart.current > 0) {
-      const currentY = e.touches[0].clientY;
-      const diff = currentY - touchStart.current;
-      if (diff > 0) {
-        setPullDistance(Math.min(diff / 2, 80));
+    const interval = setInterval(() => {
+      if (!selectedShort && !selectedLong && currentView === AppView.HOME) {
+        loadData(true);
       }
-    }
-  };
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [loadData, selectedShort, selectedLong, currentView]);
 
-  const handleTouchEnd = () => {
-    if (pullDistance > 60) {
-      setRefreshing(true);
-      loadData();
-    } else {
-      setPullDistance(0);
-    }
-    touchStart.current = 0;
+  const handlePlayShort = (video: Video, list: Video[]) => {
+    const keywords = getAIKeywords();
+    const sortedList = [...list].sort((a, b) => {
+      const scoreA = keywords.reduce((acc, kw) => acc + (a.title?.toLowerCase().includes(kw) ? 10 : 0), 0);
+      const scoreB = keywords.reduce((acc, kw) => acc + (b.title?.toLowerCase().includes(kw) ? 10 : 0), 0);
+      return scoreB - scoreA;
+    });
+    setSelectedShort({ video, list: sortedList });
   };
 
   const handleToggleLike = async (id: string) => {
@@ -150,19 +199,18 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    const activeVideos = videos.filter(v => !interactions.dislikedIds.includes(v.id || v.video_url));
-
+    const allAvailable = videos;
     switch (currentView) {
       case AppView.TREND:
-        return <TrendPage onPlayShort={(v, list) => setSelectedShort({ video: v, list })} onPlayLong={(v) => setSelectedLong({ video: v, list: activeVideos.filter(vid => vid.type === 'long'), autoNext: true })} excludedIds={interactions.dislikedIds} />;
+        return <TrendPage onPlayShort={handlePlayShort} onPlayLong={(v) => setSelectedLong({ video: v, list: allAvailable.filter(vid => vid.type === 'long'), autoNext: true })} excludedIds={interactions.dislikedIds} />;
       case AppView.SAVED:
-        return <SavedPage savedIds={interactions.savedIds} allVideos={activeVideos} onPlayShort={(v, list) => setSelectedShort({ video: v, list })} onPlayLong={(v) => setSelectedLong({ video: v, list: activeVideos.filter(v => interactions.savedIds.includes(v.id || v.video_url)), autoNext: true })} />;
+        return <SavedPage savedIds={interactions.savedIds} allVideos={allAvailable} onPlayShort={handlePlayShort} onPlayLong={(v) => setSelectedLong({ video: v, list: allAvailable.filter(v => interactions.savedIds.includes(v.id || v.video_url)), autoNext: true })} />;
       case AppView.LIKES:
-        return <SavedPage savedIds={interactions.likedIds} allVideos={activeVideos} onPlayShort={(v, list) => setSelectedShort({ video: v, list })} onPlayLong={(v) => setSelectedLong({ video: v, list: activeVideos.filter(v => interactions.likedIds.includes(v.id || v.video_url)), autoNext: true })} title="الإعجابات" />;
+        return <SavedPage savedIds={interactions.likedIds} allVideos={allAvailable} onPlayShort={handlePlayShort} onPlayLong={(v) => setSelectedLong({ video: v, list: allAvailable.filter(v => interactions.likedIds.includes(v.id || v.video_url)), autoNext: true })} title="الإعجابات" />;
       case AppView.UNWATCHED:
-        return <UnwatchedPage watchHistory={interactions.watchHistory} allVideos={activeVideos} onPlayShort={(v, list) => setSelectedShort({ video: v, list })} onPlayLong={(v) => setSelectedLong({ video: v, list: activeVideos.filter(vid => vid.type === 'long'), autoNext: true })} />;
+        return <UnwatchedPage watchHistory={interactions.watchHistory} allVideos={allAvailable} onPlayShort={handlePlayShort} onPlayLong={(v) => setSelectedLong({ video: v, list: allAvailable.filter(vid => vid.type === 'long'), autoNext: true })} />;
       case AppView.HIDDEN:
-        return <HiddenVideosPage interactions={interactions} allVideos={videos} onRestore={handleToggleDislike} onPlayShort={(v, list) => setSelectedShort({ video: v, list })} onPlayLong={(v) => setSelectedLong({ video: v, list: [v], autoNext: false })} />;
+        return <HiddenVideosPage interactions={interactions} allVideos={allAvailable} onRestore={handleToggleDislike} onPlayShort={handlePlayShort} onPlayLong={(v) => setSelectedLong({ video: v, list: [v], autoNext: false })} />;
       case AppView.PRIVACY:
         return <PrivacyPage />;
       default:
@@ -170,10 +218,10 @@ const App: React.FC = () => {
           <MainContent 
             videos={videos} 
             interactions={interactions}
-            onPlayShort={(v, list) => setSelectedShort({ video: v, list })}
-            onPlayLong={(v, autoNext = false) => setSelectedLong({ video: v, list: activeVideos.filter(vid => vid.type === 'long'), autoNext })}
+            onPlayShort={handlePlayShort}
+            onPlayLong={(v, autoNext = false) => setSelectedLong({ video: v, list: allAvailable.filter(vid => vid.type === 'long'), autoNext })}
             onViewUnwatched={() => setCurrentView(AppView.UNWATCHED)}
-            loading={loading || refreshing}
+            loading={loading && videos.length === 0}
           />
         );
     }
@@ -182,20 +230,24 @@ const App: React.FC = () => {
   return (
     <div 
       className="min-h-screen pb-20 max-w-md mx-auto relative bg-[#0f0f0f] shadow-2xl overflow-x-hidden"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      onTouchStart={(e) => { if (window.scrollY === 0) touchStart.current = e.touches[0].clientY; }}
+      onTouchMove={(e) => {
+        if (window.scrollY === 0 && touchStart.current > 0) {
+          const currentY = e.touches[0].clientY;
+          const diff = currentY - touchStart.current;
+          if (diff > 0) setPullDistance(Math.min(diff / 2, 80));
+        }
+      }}
+      onTouchEnd={() => {
+        if (pullDistance > 60) { setRefreshing(true); loadData(); } else setPullDistance(0);
+        touchStart.current = 0;
+      }}
     >
       <AppBar onViewChange={setCurrentView} onRefresh={loadData} currentView={currentView} />
       
-      <div 
-        className="fixed left-0 right-0 z-40 flex justify-center transition-all pointer-events-none" 
-        style={{ top: `${pullDistance + 10}px`, opacity: pullDistance / 60 }}
-      >
+      <div className="fixed left-0 right-0 z-40 flex justify-center transition-all pointer-events-none" style={{ top: `${pullDistance + 10}px`, opacity: pullDistance / 60 }}>
         <div className={`p-2 bg-red-600 rounded-full shadow-lg ${refreshing ? 'animate-spin' : ''}`}>
-          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
         </div>
       </div>
 

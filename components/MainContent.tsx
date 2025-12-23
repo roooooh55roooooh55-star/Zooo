@@ -18,6 +18,15 @@ const formatBigNumber = (num: number) => {
   return num.toString();
 };
 
+// التحقق مما إذا كان الفيديو "جديداً" (مضاف خلال آخر 48 ساعة)
+const isRecentVideo = (video: Video) => {
+  if (!video.created_at) return false;
+  const videoDate = new Date(video.created_at).getTime();
+  const now = new Date().getTime();
+  const diffHours = (now - videoDate) / (1000 * 60 * 60);
+  return diffHours < 48;
+};
+
 interface VideoPreviewProps {
   video: Video;
   onClick: () => void;
@@ -28,7 +37,8 @@ interface VideoPreviewProps {
 const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, isLong }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const stats = useMemo(() => getDeterministicStats(video.video_url), [video.video_url]);
-  
+  const isNew = useMemo(() => isRecentVideo(video), [video.created_at]);
+
   useEffect(() => { 
     const v = videoRef.current;
     if (!v) return;
@@ -59,6 +69,14 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
   return (
     <div onClick={onClick} className={`relative overflow-hidden cursor-pointer group bg-neutral-900 border border-white/5 transition-all active:scale-95 ${className}`}>
       <video ref={videoRef} src={video.video_url} muted autoPlay loop playsInline preload="auto" className="w-full h-full object-cover transition-transform group-hover:scale-110 relative z-10" />
+      
+      {/* ملصق "جديد" احترافي */}
+      {isNew && (
+        <div className="absolute top-2 right-2 z-30 bg-red-600 text-white text-[8px] font-black px-2 py-0.5 rounded-full shadow-[0_0_10px_rgba(220,38,38,0.8)] border border-red-400 animate-pulse">
+          جديد
+        </div>
+      )}
+
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent p-3 flex flex-col justify-end z-20">
         <p className="text-[10px] font-bold text-white line-clamp-2 text-right">{video.title || "الحديقة المرعبة"}</p>
         <div className="flex items-center justify-between mt-1">
@@ -185,7 +203,12 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
 
   const dislikedIds = useMemo(() => new Set(interactions.dislikedIds), [interactions.dislikedIds]);
 
-  // استخراج الفيديوهات وتقسيمها لمجموعات
+  // استخراج الفيديوهات وتقسيمها لمجموعات بناءً على الطلب:
+  // 1. 4 شورتس
+  // 2. مكمل رعب (إذا وجد)
+  // 3. 4 فيديوهات طويلة
+  // 4. 4 شورتس إضافية
+  // 5. 4 فيديوهات طويلة إضافية
   const allShorts = useMemo(() => videos.filter(v => v.type === 'short' && !dislikedIds.has(v.id || v.video_url)), [videos, dislikedIds]);
   const allLongs = useMemo(() => videos.filter(v => v.type === 'long' && !dislikedIds.has(v.id || v.video_url)), [videos, dislikedIds]);
 
@@ -203,7 +226,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
 
   return (
     <div className="flex flex-col gap-2 pb-32">
-      {/* المجموعة الأولى من الشورتس */}
+      {/* 1. المجموعة الأولى من الشورتس */}
       <section className="mt-2">
         <div className="flex items-center gap-3 mb-4 px-1">
           <div className="relative">
@@ -220,7 +243,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </div>
       </section>
 
-      {/* قسم مكمل رعب */}
+      {/* 2. قسم مكمل رعب */}
       {unwatchedVideos.length > 0 && (
         <section className="mt-8">
           <div className="flex items-center justify-between mb-4 px-1">
@@ -234,7 +257,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </section>
       )}
 
-      {/* المجموعة الأولى من الفيديوهات الطويلة */}
+      {/* 3. المجموعة الأولى من الفيديوهات الطويلة */}
       <section className="mt-8">
         <div className="flex items-center gap-2 mb-6 px-1">
           <div className="w-1.5 h-6 bg-green-500 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.3)]"></div>
@@ -245,7 +268,11 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
              <div key={video.id || video.video_url} onClick={() => onPlayLong(video, true)} className="bg-neutral-900/40 rounded-[2.5rem] border border-white/5 overflow-hidden active:scale-[0.98] transition-all shadow-2xl">
               <div className="relative aspect-video w-full bg-black">
                 <video src={video.video_url} muted autoPlay loop playsInline preload="auto" className="w-full h-full object-cover relative z-10" />
-                <div className="absolute top-5 left-5 bg-red-600/90 backdrop-blur-lg text-[10px] px-3 py-1 rounded-full font-black text-white shadow-xl z-20">جديد</div>
+                
+                {/* ملصق "جديد" احترافي للطويل */}
+                {isRecentVideo(video) && (
+                   <div className="absolute top-5 left-5 bg-red-600/90 backdrop-blur-lg text-[10px] px-3 py-1 rounded-full font-black text-white shadow-xl z-20 border border-red-400">جديد</div>
+                )}
               </div>
               <div className="p-6 flex items-center justify-between z-20 bg-[#0f0f0f]/80 backdrop-blur-sm">
                 <h3 className="text-base font-bold line-clamp-1 text-right">{video.title}</h3>
@@ -266,7 +293,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </div>
       </section>
 
-      {/* المجموعة الثانية من الشورتس (جديد) */}
+      {/* 4. المجموعة الثانية من الشورتس */}
       {shortGroups[1].length > 0 && (
         <section className="mt-12">
           <div className="flex items-center gap-2 mb-6 px-1">
@@ -281,18 +308,21 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </section>
       )}
 
-      {/* المجموعة الثانية من الفيديوهات الطويلة (جديد) */}
+      {/* 5. المجموعة الثانية من الفيديوهات الطويلة */}
       {longGroups[1].length > 0 && (
         <section className="mt-12">
           <div className="flex items-center gap-2 mb-6 px-1">
             <div className="w-1.5 h-6 bg-blue-600 rounded-full shadow-[0_0_10px_rgba(37,99,235,0.3)]"></div>
-            <h2 className="text-xl font-black text-white">سلاسل غامضة</h2>
+            <h2 className="text-xl font-black text-white italic">سلاسل غامضة</h2>
           </div>
           <div className="flex flex-col gap-6">
             {longGroups[1].map((video) => (
                <div key={video.id || video.video_url} onClick={() => onPlayLong(video, true)} className="bg-neutral-900/40 rounded-[2.5rem] border border-white/5 overflow-hidden active:scale-[0.98] transition-all shadow-2xl">
                 <div className="relative aspect-video w-full bg-black">
                   <video src={video.video_url} muted autoPlay loop playsInline preload="auto" className="w-full h-full object-cover relative z-10" />
+                  {isRecentVideo(video) && (
+                   <div className="absolute top-5 left-5 bg-red-600/90 backdrop-blur-lg text-[10px] px-3 py-1 rounded-full font-black text-white shadow-xl z-20 border border-red-400">جديد</div>
+                  )}
                 </div>
                 <div className="p-6 flex items-center justify-between z-20 bg-[#0f0f0f]/80 backdrop-blur-sm">
                   <h3 className="text-base font-bold line-clamp-1 text-right">{video.title}</h3>

@@ -9,12 +9,16 @@ interface Message {
 
 const AIOracle: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const saved = localStorage.getItem('al-hadiqa-ai-history');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    localStorage.setItem('al-hadiqa-ai-history', JSON.stringify(messages));
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
@@ -49,7 +53,6 @@ const AIOracle: React.FC = () => {
 
   return (
     <>
-      {/* Floating Button */}
       <button 
         onClick={() => setIsOpen(true)}
         className="fixed bottom-24 right-6 z-[100] w-14 h-14 bg-red-600 rounded-full shadow-[0_0_20px_rgba(220,38,38,0.8)] border-2 border-red-400 flex items-center justify-center animate-bounce active:scale-90 transition-all"
@@ -60,7 +63,6 @@ const AIOracle: React.FC = () => {
         </svg>
       </button>
 
-      {/* Chat Modal */}
       {isOpen && (
         <div className="fixed inset-0 z-[101] bg-black/90 backdrop-blur-md flex flex-col p-4 animate-in fade-in zoom-in duration-300">
           <div className="flex items-center justify-between border-b border-red-600/30 pb-4 mb-4">
