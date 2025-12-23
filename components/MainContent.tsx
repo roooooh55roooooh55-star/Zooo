@@ -158,12 +158,13 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
   const allShorts = useMemo(() => videos.filter(v => v.type === 'short'), [videos]);
   const allLongs = useMemo(() => videos.filter(v => v.type === 'long'), [videos]);
 
-  // تقسيم الشورتس بدقة إلى 4 في القسم العلوي و 4 في "لقطات إضافية"
+  // تقسيم الفيديوهات بناءً على طلب المستخدم
   const topShorts = useMemo(() => allShorts.slice(0, 4), [allShorts]);
   const extraShorts = useMemo(() => allShorts.slice(4, 8), [allShorts]);
+  const bottomShorts = useMemo(() => allShorts.slice(8), [allShorts]);
 
-  const topLongs = useMemo(() => allLongs.slice(0, 4), [allLongs]);
-  const extraLongs = useMemo(() => allLongs.slice(4, 8), [allLongs]);
+  const section1Longs = useMemo(() => allLongs.slice(0, 4), [allLongs]);
+  const section2Longs = useMemo(() => allLongs.slice(4, 8), [allLongs]);
 
   if (loading && videos.length === 0) {
     return (
@@ -176,6 +177,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
 
   return (
     <div className="flex flex-col gap-2 pb-32">
+      {/* 1. قسم الحديقة المرعبة (أول 4 شورتس) */}
       <section className="mt-2">
         <div className="flex items-center gap-3 mb-4 px-1">
           <div className="relative">
@@ -192,6 +194,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </div>
       </section>
 
+      {/* 2. قسم مكمل رعب (أفقي) */}
       {unwatchedVideos.length > 0 && (
         <section className="mt-8">
           <div className="flex items-center justify-between mb-4 px-1">
@@ -205,13 +208,14 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </section>
       )}
 
+      {/* 3. قسم سلاسل الحديقة (أول 4 طويلة) */}
       <section className="mt-8">
         <div className="flex items-center gap-2 mb-6 px-1">
           <div className="w-1.5 h-6 bg-green-500 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.3)]"></div>
           <h2 className="text-xl font-black text-white">سلاسل الحديقة</h2>
         </div>
         <div className="flex flex-col gap-6">
-          {topLongs.map((video) => (
+          {section1Longs.map((video) => (
              <div key={video.id || video.video_url} onClick={() => onPlayLong(video, true)} className="bg-neutral-900/40 rounded-[2.5rem] border border-white/5 overflow-hidden active:scale-[0.98] transition-all shadow-2xl">
               <div className="relative aspect-video w-full bg-black">
                 <video src={video.video_url} muted autoPlay loop playsInline className="w-full h-full object-cover relative z-10" />
@@ -227,6 +231,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </div>
       </section>
 
+      {/* 4. قسم لقطات إضافية (4 شورتس تالية) */}
       {extraShorts.length > 0 && (
         <section className="mt-12">
           <div className="flex items-center gap-2 mb-6 px-1">
@@ -241,14 +246,15 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </section>
       )}
 
-      {extraLongs.length > 0 && (
+      {/* 5. قسم فيديوهات طويلة (4 طويلة تالية) */}
+      {section2Longs.length > 0 && (
         <section className="mt-12">
           <div className="flex items-center gap-2 mb-6 px-1">
             <div className="w-1.5 h-6 bg-blue-600 rounded-full shadow-[0_0_10px_rgba(37,99,235,0.3)]"></div>
-            <h2 className="text-xl font-black text-white italic">سلاسل غامضة</h2>
+            <h2 className="text-xl font-black text-white italic">فيديوهات طويلة</h2>
           </div>
           <div className="flex flex-col gap-6">
-            {extraLongs.map((video) => (
+            {section2Longs.map((video) => (
                <div key={video.id || video.video_url} onClick={() => onPlayLong(video, true)} className="bg-neutral-900/40 rounded-[2.5rem] border border-white/5 overflow-hidden active:scale-[0.98] transition-all shadow-2xl">
                 <div className="relative aspect-video w-full bg-black">
                   <video src={video.video_url} muted autoPlay loop playsInline className="w-full h-full object-cover relative z-10" />
@@ -260,6 +266,21 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
                   <h3 className="text-base font-bold line-clamp-1 text-right">{video.title}</h3>
                 </div>
               </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 6. قسم شورتس (باقي فيديوهات الشورتس) */}
+      {bottomShorts.length > 0 && (
+        <section className="mt-12">
+          <div className="flex items-center gap-2 mb-6 px-1">
+            <div className="w-1.5 h-6 bg-yellow-600 rounded-full shadow-[0_0_10px_rgba(234,179,8,0.3)]"></div>
+            <h2 className="text-xl font-black text-white italic">شورتس</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {bottomShorts.map((video) => (
+              <VideoPreview key={video.id || video.video_url} video={video} onClick={() => onPlayShort(video, allShorts)} className="aspect-[9/16] rounded-2xl shadow-lg shadow-black/50" />
             ))}
           </div>
         </section>
