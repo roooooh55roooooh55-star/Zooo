@@ -54,12 +54,15 @@ const App: React.FC = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      // جلب آخر 100 فيديو مضاف لضمان الحداثة
       const data = await fetchVideos(undefined, 100);
       if (data && data.length > 0) {
+        // نخلطهم لضمان واجهة "حية" ومتغيرة دائماً للمستخدم
         const shuffled = shuffleArray(data);
         setVideos(shuffled);
-        // تحميل مسبق لأول 5 فيديوهات لضمان تشغيل فوري
-        shuffled.slice(0, 5).forEach(v => preloadVideoFile(v.video_url));
+        
+        // تحميل مسبق مكثف (أول 10 فيديوهات) لضمان سرعة فائقة
+        shuffled.slice(0, 10).forEach(v => preloadVideoFile(v.video_url));
       }
     } catch (err) {
       console.error("Data load error", err);
