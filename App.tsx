@@ -80,7 +80,6 @@ const App: React.FC = () => {
       const history = [...prev.watchHistory];
       const index = history.findIndex(h => h.id === id);
       if (index > -1) { 
-        // تحديث التقدم فقط إذا كان أكبر من الحالي لضمان عدم الرجوع للخلف في التقدم
         if (progress > history[index].progress) history[index].progress = progress; 
       } 
       else { history.push({ id, progress }); }
@@ -88,14 +87,24 @@ const App: React.FC = () => {
     });
   };
 
+  // وظيفة تصفير سجل المشاهدة (Hard Reset)
+  const resetWatchHistory = useCallback(() => {
+    setInteractions(prev => ({
+      ...prev,
+      watchHistory: []
+    }));
+    setRefreshTrigger(prev => prev + 1);
+    loadData();
+    // تمرير اهتزاز بسيط للمستخدم ليشعر بالاستجابة إذا كان الجهاز يدعم ذلك
+    if (navigator.vibrate) navigator.vibrate(50);
+  }, [loadData]);
+
   const handlePlayShort = (v: Video, list: Video[]) => {
-    // بمجرد النقر، نسجل أن الفيديو "بدأ" لكي يختفي من القائمة الرئيسية عند العودة
     updateWatchHistory(v.id || v.video_url, 0.01);
     setSelectedShort({ video: v, list });
   };
 
   const handlePlayLong = (v: Video, autoNext = false) => {
-    // بمجرد النقر، نسجل أن الفيديو "بدأ" لكي يختفي من القائمة الرئيسية عند العودة
     updateWatchHistory(v.id || v.video_url, 0.01);
     setSelectedLong({ video: v, list: rawVideos.filter(vid => vid.type === 'long'), autoNext });
   };
@@ -144,6 +153,7 @@ const App: React.FC = () => {
             onPlayShort={handlePlayShort}
             onPlayLong={handlePlayLong}
             onViewUnwatched={() => setCurrentView(AppView.UNWATCHED)}
+            onResetHistory={resetWatchHistory}
             loading={loading && rawVideos.length === 0}
           />
         );
@@ -163,13 +173,12 @@ const App: React.FC = () => {
       onTouchEnd={() => {
         if (pullDistance > 60) {
           setRefreshing(true);
-          setRefreshTrigger(prev => prev + 1);
           loadData();
         } else setPullDistance(0);
         touchStart.current = 0;
       }}
     >
-      <AppBar onViewChange={setCurrentView} onRefresh={() => { setRefreshTrigger(n => n + 1); loadData(); }} currentView={currentView} />
+      <AppBar onViewChange={setCurrentView} onRefresh={resetWatchHistory} currentView={currentView} />
       
       <div className="fixed left-0 right-0 z-[60] flex justify-center transition-all pointer-events-none" style={{ top: `${pullDistance + 10}px`, opacity: pullDistance / 60 }}>
         <div className={`p-2 bg-red-600 rounded-full shadow-[0_0_20px_red] ${refreshing ? 'animate-spin' : ''}`}>

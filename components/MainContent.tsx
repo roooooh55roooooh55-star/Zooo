@@ -102,29 +102,38 @@ interface DraggableMarqueeProps {
   videos: Video[];
   onPlay: (v: Video) => void;
   progressMap?: Map<string, number>;
+  autoAnimate?: boolean;
 }
 
-const DraggableMarquee: React.FC<DraggableMarqueeProps> = ({ videos, onPlay, progressMap }) => {
+const DraggableMarquee: React.FC<DraggableMarqueeProps> = ({ videos, onPlay, progressMap, autoAnimate }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  const marqueeList = useMemo(() => autoAnimate ? [...videos, ...videos] : videos, [videos, autoAnimate]);
+
   return (
-    <div ref={scrollRef} className="flex gap-4 overflow-x-auto scrollbar-hide px-4 pb-6" style={{ direction: 'rtl' }}>
-      {videos.map((video, i) => {
-        const prog = progressMap?.get(video.id || video.video_url) || 0;
-        return (
-          <div key={`${video.id || video.video_url}-${i}`} onClick={() => onPlay(video)} className="flex-shrink-0 w-56 group">
-            <div className="relative rounded-[2rem] overflow-hidden aspect-video bg-neutral-900 border border-white/10 shadow-xl transition-all group-active:scale-95">
-              <video src={video.video_url} muted loop playsInline autoPlay preload="metadata" className="w-full h-full object-cover opacity-70" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-              {prog > 0 && (
-                <div className="absolute bottom-0 left-0 w-full h-1 bg-white/10">
-                  <div className="h-full bg-red-600 shadow-[0_0_10px_red]" style={{ width: `${prog * 100}%` }}></div>
-                </div>
-              )}
+    <div className={`relative ${autoAnimate ? 'marquee-container overflow-hidden' : 'overflow-x-auto px-4'} pb-2`} style={{ direction: 'rtl' }}>
+      <div 
+        ref={scrollRef} 
+        className={`flex gap-4 ${autoAnimate ? 'animate-marquee' : 'scrollbar-hide'}`}
+      >
+        {marqueeList.map((video, i) => {
+          const prog = progressMap?.get(video.id || video.video_url) || 0;
+          return (
+            <div key={`${video.id || video.video_url}-${i}`} onClick={() => onPlay(video)} className="flex-shrink-0 w-56 group">
+              <div className="relative rounded-[2rem] overflow-hidden aspect-video bg-neutral-900 border border-white/10 shadow-xl transition-all group-active:scale-95 group-hover:border-red-500/30">
+                <video src={video.video_url} muted loop playsInline autoPlay preload="metadata" className="w-full h-full object-cover opacity-70" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                {prog > 0 && (
+                  <div className="absolute bottom-0 left-0 w-full h-1 bg-white/10">
+                    <div className="h-full bg-red-600 shadow-[0_0_8px_red]" style={{ width: `${prog * 100}%` }}></div>
+                  </div>
+                )}
+              </div>
+              <p className="text-[10px] font-black text-gray-300 truncate mt-2 text-right px-2 group-hover:text-white transition-colors">{video.title}</p>
             </div>
-            <p className="text-[10px] font-black text-gray-300 truncate mt-2 text-right px-2 group-hover:text-white transition-colors">{video.title}</p>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 };
@@ -135,17 +144,23 @@ interface MainContentProps {
   onPlayShort: (v: Video, list: Video[]) => void;
   onPlayLong: (v: Video, autoNext?: boolean) => void;
   onViewUnwatched: () => void;
+  onResetHistory: () => void;
   loading: boolean;
 }
 
-const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayShort, onPlayLong, onViewUnwatched, loading }) => {
-  // معرفة الفيديوهات التي تم النقر عليها أو مشاهدتها
+const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayShort, onPlayLong, onViewUnwatched, onResetHistory, loading }) => {
   const watchedIds = useMemo(() => new Set(interactions.watchHistory.map(h => h.id)), [interactions.watchHistory]);
+
+  const getSmartFilledList = (pool: Video[], count: number) => {
+    const unwatched = pool.filter(v => !watchedIds.has(v.id || v.video_url));
+    if (unwatched.length >= count) return unwatched.slice(0, count);
+    const watched = pool.filter(v => watchedIds.has(v.id || v.video_url));
+    return [...unwatched, ...watched.slice(0, count - unwatched.length)];
+  };
 
   const unwatchedHistoryMap = useMemo(() => {
     const map = new Map<string, number>();
     interactions.watchHistory.forEach(h => {
-      // الفيديوهات التي لم تكتمل (بين 5% و 95%) تظهر في قسم "مكمل رعب"
       if (h.progress > 0.05 && h.progress < 0.95) map.set(h.id, h.progress);
     });
     return map;
@@ -160,33 +175,22 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
     return list.reverse();
   }, [videos, unwatchedHistoryMap]);
 
-  // استبعاد الفيديوهات التي تمت مشاهدتها من القوائم الرئيسية تماماً
-  const unwatchedVideosPool = useMemo(() => {
-    return videos.filter(v => !watchedIds.has(v.id || v.video_url));
-  }, [videos, watchedIds]);
+  const allShorts = useMemo(() => videos.filter(v => v.type === 'short'), [videos]);
+  const allLongs = useMemo(() => videos.filter(v => v.type === 'long'), [videos]);
 
-  const allShortsUnwatched = useMemo(() => unwatchedVideosPool.filter(v => v.type === 'short'), [unwatchedVideosPool]);
-  const allLongsUnwatched = useMemo(() => unwatchedVideosPool.filter(v => v.type === 'long'), [unwatchedVideosPool]);
-
-  const latestShorts = useMemo(() => {
-    return [...allShortsUnwatched].sort((a, b) => {
-      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return dateB - dateA;
-    }).slice(0, 4);
-  }, [allShortsUnwatched]);
-
-  const featuredLongs = useMemo(() => allLongsUnwatched.slice(0, 4), [allLongsUnwatched]);
+  const latestShorts = useMemo(() => getSmartFilledList(allShorts, 4), [allShorts, watchedIds]);
+  const featuredLongs = useMemo(() => getSmartFilledList(allLongs, 4), [allLongs, watchedIds]);
 
   const undiscoveredShorts = useMemo(() => {
     const latestIds = new Set(latestShorts.map(v => v.id || v.video_url));
-    return allShortsUnwatched.filter(v => !latestIds.has(v.id || v.video_url)).slice(0, 4);
-  }, [allShortsUnwatched, latestShorts]);
+    const pool = allShorts.filter(v => !latestIds.has(v.id || v.video_url));
+    return getSmartFilledList(pool, 4);
+  }, [allShorts, latestShorts, watchedIds]);
 
   const remainingLongs = useMemo(() => {
     const featuredIds = new Set(featuredLongs.map(v => v.id || v.video_url));
-    return allLongsUnwatched.filter(v => !featuredIds.has(v.id || v.video_url));
-  }, [allLongsUnwatched, featuredLongs]);
+    return allLongs.filter(v => !featuredIds.has(v.id || v.video_url));
+  }, [allLongs, featuredLongs]);
 
   if (loading && videos.length === 0) {
     return (
@@ -198,24 +202,26 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
   }
 
   return (
-    <div className="flex flex-col gap-14 pb-32">
-      {/* 1. الحديقة المرعبة (أحدث 4 شورتس لم تشاهد بعد) */}
+    <div className="flex flex-col gap-14 pb-4">
+      {/* 1. الحديقة المرعبة */}
       <section>
-        <div className="flex items-center gap-3 mb-6 px-1">
-          <img src="https://i.top4top.io/p_3643ksmii1.jpg" className="w-10 h-10 rounded-full border-2 border-red-600 shadow-[0_0_15px_red] object-cover" />
+        <div 
+          onClick={onResetHistory}
+          className="flex items-center gap-3 mb-6 px-1 cursor-pointer group active:scale-95 transition-all"
+        >
+          <img src="https://i.top4top.io/p_3643ksmii1.jpg" className="w-10 h-10 rounded-full border-2 border-red-600 shadow-[0_0_15px_red] object-cover group-hover:shadow-[0_0_25px_red] transition-shadow" />
           <div className="flex flex-col">
-            <h2 className="text-xl font-black text-red-600 italic leading-none">الحديقة المرعبة</h2>
-            <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Latest Uploads</span>
+            <h2 className="text-xl font-black text-red-600 italic leading-none group-hover:text-red-500">الحديقة المرعبة</h2>
+            <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Tap to Reset & Sync</span>
           </div>
           <div className="flex-grow h-[1px] bg-gradient-to-l from-red-600/40 to-transparent"></div>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          {latestShorts.map((v) => <VideoPreview key={v.id || v.video_url} video={v} onClick={() => onPlayShort(v, allShortsUnwatched)} className="aspect-[9/16] rounded-[2rem] shadow-2xl" />)}
-          {latestShorts.length === 0 && <p className="col-span-2 text-center text-gray-600 text-[10px] font-bold py-4">لقد شاهدت كل جديد في الحديقة!</p>}
+          {latestShorts.map((v) => <VideoPreview key={v.id || v.video_url} video={v} onClick={() => onPlayShort(v, allShorts)} className="aspect-[9/16] rounded-[2rem] shadow-2xl" />)}
         </div>
       </section>
 
-      {/* 2. مكمل رعب (أفقي - القسم الوحيد الذي يظهر فيه الفيديوهات التي بدأت بمشاهدتها) */}
+      {/* 2. مكمل رعب */}
       {continueWatchingVideos.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-4 px-1">
@@ -229,7 +235,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </section>
       )}
 
-      {/* 3. سلاسل الحديقة (الفيديوهات الطويلة الجديدة) */}
+      {/* 3. سلاسل الحديقة */}
       <section>
         <div className="flex items-center gap-3 mb-6 px-1">
           <div className="w-2.5 h-8 bg-green-500 rounded-full shadow-[0_0_15px_rgba(34,197,94,0.6)]"></div>
@@ -250,25 +256,23 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </div>
       </section>
 
-      {/* 4. اكتشافات جديدة (شورتس عشوائية لم تشاهد بعد) */}
-      {undiscoveredShorts.length > 0 && (
-        <section>
-          <div className="flex items-center gap-3 mb-6 px-1">
-            <div className="w-2.5 h-8 bg-yellow-600 rounded-full shadow-[0_0_15px_yellow]"></div>
-            <div className="flex flex-col">
-              <h2 className="text-xl font-black text-white italic leading-none">اكتشافات جديدة</h2>
-              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Unwatched Shorts</span>
-            </div>
+      {/* 4. اكتشافات جديدة */}
+      <section>
+        <div className="flex items-center gap-3 mb-6 px-1">
+          <div className="w-2.5 h-8 bg-yellow-600 rounded-full shadow-[0_0_15px_yellow]"></div>
+          <div className="flex flex-col">
+            <h2 className="text-xl font-black text-white italic leading-none">اكتشافات جديدة</h2>
+            <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Unwatched Shorts</span>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            {undiscoveredShorts.map((v) => <VideoPreview key={v.id || v.video_url} video={v} onClick={() => onPlayShort(v, allShortsUnwatched)} className="aspect-[9/16] rounded-[2rem] shadow-2xl" />)}
-          </div>
-        </section>
-      )}
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          {undiscoveredShorts.map((v) => <VideoPreview key={v.id || v.video_url} video={v} onClick={() => onPlayShort(v, allShorts)} className="aspect-[9/16] rounded-[2rem] shadow-2xl" />)}
+        </div>
+      </section>
 
-      {/* 5. سلاسل إضافية */}
+      {/* 5. سلاسل إضافية - ينتهي عند زر الـ AI */}
       {remainingLongs.length > 0 && (
-        <section className="mb-10">
+        <section className="mb-4">
           <div className="flex items-center gap-3 mb-6 px-1">
             <div className="w-2.5 h-8 bg-blue-600 rounded-full shadow-[0_0_15px_blue]"></div>
             <div className="flex flex-col">
@@ -276,7 +280,11 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
               <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Explore More Series</span>
             </div>
           </div>
-          <DraggableMarquee videos={remainingLongs} onPlay={(v) => onPlayLong(v, true)} />
+          <DraggableMarquee 
+            videos={remainingLongs} 
+            onPlay={(v) => onPlayLong(v, true)} 
+            autoAnimate={true}
+          />
         </section>
       )}
     </div>
