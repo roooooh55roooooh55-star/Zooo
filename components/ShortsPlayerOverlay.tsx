@@ -56,15 +56,14 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
       const vid = videoRefs.current[currentIndex];
       if (vid) {
         vid.muted = isMuted;
-        vid.load(); // إجبار المتصفح على التأكد من التحميل
         vid.play().catch(() => {
           vid.muted = true;
           vid.play().catch(() => {});
         });
       }
 
-      // تحميل مسبق مكثف للفيديو التالي
-      [1, 2].forEach(offset => {
+      // تحميل مسبق مكثف للأربعة فيديوهات القادمة لضمان سرعة خرافية (Turbo Loading)
+      [1, 2, 3, 4].forEach(offset => {
         const nextIdx = currentIndex + offset;
         if (nextIdx < videoList.length) {
           const v = videoList[nextIdx];
@@ -77,15 +76,15 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
       });
     }
     
-    // إيقاف الفيديوهات البعيدة لتوفير الرام
+    // إدارة الرام: إيقاف وتفريغ الفيديوهات البعيدة لضمان استقرار التطبيق
     Object.keys(videoRefs.current).forEach((key) => {
       const idx = parseInt(key);
       const vid = videoRefs.current[idx];
-      if (vid && Math.abs(idx - currentIndex) > 1) {
+      if (vid && Math.abs(idx - currentIndex) > 2) {
         vid.pause();
-        vid.src = ""; // تفريغ المصادر القديمة
+        vid.src = ""; 
         vid.load();
-        vid.src = videoList[idx].video_url; // إعادة الربط للجاهزية
+        vid.src = videoList[idx].video_url; 
       }
     });
   }, [currentIndex, isMuted, videoList]);
@@ -94,7 +93,9 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
     const height = e.currentTarget.clientHeight;
     if (height === 0) return;
     const index = Math.round(e.currentTarget.scrollTop / height);
-    if (index !== currentIndex && index >= 0 && index < videoList.length) setCurrentIndex(index);
+    if (index !== currentIndex && index >= 0 && index < videoList.length) {
+      setCurrentIndex(index);
+    }
   };
 
   const handleVideoEnded = () => {
@@ -119,7 +120,6 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
           const stats = getDeterministicStats(video.video_url);
           const isLiked = interactions.likedIds.includes(videoId);
           const isDisliked = interactions.dislikedIds.includes(videoId);
-          const isSaved = interactions.savedIds.includes(videoId);
 
           return (
             <div key={`${videoId}-${idx}`} className="h-full w-full snap-start relative bg-black flex items-center justify-center overflow-hidden">
@@ -127,7 +127,8 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
                 ref={el => { videoRefs.current[idx] = el; }}
                 src={video.video_url} 
                 className="h-full w-full object-cover relative z-10"
-                playsInline preload="auto"
+                playsInline 
+                preload={Math.abs(idx - currentIndex) <= 2 ? "auto" : "metadata"}
                 muted={idx !== currentIndex || isMuted}
                 onEnded={idx === currentIndex ? handleVideoEnded : undefined}
                 onTimeUpdate={(e) => idx === currentIndex && onProgress(videoId, e.currentTarget.currentTime / e.currentTarget.duration)}
