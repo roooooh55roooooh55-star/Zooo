@@ -78,8 +78,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
 
           setLastUploaded(newVideo);
           if (onNewVideo) onNewVideo(newVideo);
+          
+          // تحديث القائمة فوراً وحفظها في LocalStorage
+          setVideos(prev => {
+            const updated = [newVideo, ...prev];
+            localStorage.setItem('app_videos_cache', JSON.stringify(updated));
+            return updated;
+          });
+          
           setUploadTitle('');
-          setVideos(prev => [newVideo, ...prev]);
         } else if (result && result.event === "close") {
           setIsUploading(false);
         }

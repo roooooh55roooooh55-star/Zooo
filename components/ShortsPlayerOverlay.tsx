@@ -62,7 +62,7 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
           const stats = getDeterministicStats(video.video_url);
           return (
             <div key={`${video.id}-${idx}`} className="h-full w-full snap-start relative bg-black flex items-center justify-center">
-              <div className="relative h-full w-full ring-2 ring-red-600/30 shadow-[inset_0_0_100px_rgba(220,38,38,0.2)]">
+              <div className="relative h-full w-full ring-2 ring-red-600 shadow-[inset_0_0_100px_rgba(220,38,38,0.2)]">
                 <video 
                     ref={el => { videoRefs.current[idx] = el; }}
                     src={video.video_url} 
@@ -77,13 +77,13 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
               <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80 pointer-events-none z-20" />
 
               <div className="absolute bottom-24 left-6 flex flex-col items-center gap-6 z-30">
-                <button onClick={() => onLike(video.id)} className="p-4 w-16 h-16 rounded-3xl border-2 neon-btn-blue bg-blue-600/20 text-white">
+                <button onClick={() => onLike(video.id)} className="p-4 w-16 h-16 rounded-3xl border-2 neon-btn-blue bg-blue-600/20 text-white shadow-[0_0_15px_rgba(59,130,246,0.3)]">
                   <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
                 </button>
-                <button onClick={() => onDislike(video.id)} className="p-4 w-16 h-16 rounded-3xl border-2 neon-btn-red bg-red-600/20 text-white">
+                <button onClick={() => onDislike(video.id)} className="p-4 w-16 h-16 rounded-3xl border-2 neon-btn-red bg-red-600/20 text-white shadow-[0_0_15px_rgba(220,38,38,0.3)]">
                   <svg className="w-7 h-7 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
                 </button>
-                <button onClick={() => onSave(video.id)} className="p-4 w-16 h-16 rounded-3xl border-2 neon-btn-yellow bg-yellow-500/20 text-white">
+                <button onClick={() => onSave(video.id)} className="p-4 w-16 h-16 rounded-3xl border-2 neon-btn-yellow bg-yellow-500/20 text-white shadow-[0_0_15px_rgba(234,179,8,0.3)]">
                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
                 </button>
               </div>

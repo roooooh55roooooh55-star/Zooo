@@ -3,7 +3,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Video, UserInteractions } from '../types.ts';
 
 const LOGO_URL = "https://i.top4top.io/p_3643ksmii1.jpg";
-const LION_URL = "https://cdn-icons-png.flaticon.com/512/616/616412.png"; // أيقونة وجه أسد احترافية
+const LION_URL = "https://cdn-icons-png.flaticon.com/512/616/616412.png"; 
 
 export const getDeterministicStats = (url: string) => {
   let hash = 0;
@@ -24,7 +24,7 @@ const DraggableMarquee: React.FC<{ videos: Video[], interactions: UserInteractio
   const [isPaused, setIsPaused] = useState(false);
 
   const displayVideos = useMemo(() => {
-    if (!Array.isArray(videos) || videos.length === 0) return Array.from({length: 4}); // هياكل فارغة للتقسيم
+    if (!Array.isArray(videos) || videos.length === 0) return Array.from({length: 4}); 
     if (!autoAnimate) return videos;
     return [...videos, ...videos];
   }, [videos, autoAnimate]);
@@ -50,7 +50,7 @@ const DraggableMarquee: React.FC<{ videos: Video[], interactions: UserInteractio
           const progress = progressMap?.get(id) || 0;
           return (
             <div key={`${id}-${i}`} onClick={() => onPlay(video)} className="flex-shrink-0 w-36 active:scale-95 transition-all group relative">
-              <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-neutral-900 aspect-video ring-1 ring-red-600/40 shadow-[0_0_8px_rgba(220,38,38,0.3)] group-hover:ring-red-600 group-hover:shadow-[0_0_15px_red] transition-all">
+              <div className="relative rounded-2xl overflow-hidden border border-red-600/50 bg-neutral-900 aspect-video ring-1 ring-red-600 shadow-[0_0_10px_rgba(220,38,38,0.3)] group-hover:ring-red-600 group-hover:shadow-[0_0_15px_red] transition-all">
                 <video src={video.video_url} muted playsInline preload="metadata" className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
                 {progress > 0 && <div className="absolute bottom-0 left-0 w-full h-1 bg-white/10 z-20"><div className="h-full bg-red-600 shadow-[0_0_8px_red]" style={{ width: `${progress * 100}%` }}></div></div>}
               </div>
@@ -83,10 +83,16 @@ const MainContent: React.FC<MainContentProps> = ({ videos, categoriesList, inter
   const safeVideos = Array.isArray(videos) ? videos : [];
 
   const categoriesData: Record<string, Video[]> = useMemo(() => {
-    const filtered = !searchQuery ? safeVideos : safeVideos.filter(v => v.title.toLowerCase().includes(searchQuery.toLowerCase()) || v.category.includes(searchQuery));
+    const filtered = !searchQuery ? safeVideos : safeVideos.filter(v => 
+      v.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      v.category.toLowerCase().includes(searchQuery.toLowerCase())
+    );
     const result: Record<string, Video[]> = {};
     categoriesList.forEach(cat => {
-        result[cat] = filtered.filter(v => v.category === cat);
+        const catVideos = filtered.filter(v => v.category === cat);
+        if (catVideos.length > 0 || !searchQuery) {
+            result[cat] = catVideos;
+        }
     });
     return result;
   }, [safeVideos, searchQuery, categoriesList]);
@@ -110,18 +116,21 @@ const MainContent: React.FC<MainContentProps> = ({ videos, categoriesList, inter
     <div className="flex flex-col gap-10 pb-2" dir="rtl">
       {/* هيدر الصفحة الرئيسي المحدث */}
       <section className="px-1 pt-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           {/* الجانب الأيمن: اللوجو والعنوان */}
-          <div onClick={onResetHistory} className="flex items-center gap-3 cursor-pointer group active:scale-95 transition-all">
-            <img src={LOGO_URL} className="w-10 h-10 rounded-full border-2 border-red-600 shadow-[0_0_15px_red] object-cover" />
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="relative">
+              <img src={LOGO_URL} className="w-10 h-10 rounded-full border-2 border-red-600 shadow-[0_0_15px_red] object-cover" />
+              <div className="absolute inset-0 rounded-full border border-red-500 animate-pulse"></div>
+            </div>
             <div className="flex flex-col text-right">
-              <h2 className="text-xl font-black text-red-600 italic leading-none">الحديقة المرعبة</h2>
-              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Dark Spirits Folder</span>
+              <h2 className="text-lg font-black text-red-600 italic leading-none">الحديقة المرعبة</h2>
+              <span className="text-[7px] text-gray-500 font-bold uppercase tracking-[0.2em] mt-1">Dark Spirits Folder</span>
             </div>
           </div>
 
           {/* المنتصف: زر البحث */}
-          <div className="flex-grow flex justify-center px-4">
+          <div className="flex-grow flex justify-center">
              {isSearchOpen ? (
                 <div className="w-full flex items-center bg-white/5 border border-red-600/50 rounded-2xl px-4 py-2 animate-in zoom-in duration-300">
                     <input 
@@ -136,7 +145,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, categoriesList, inter
              ) : (
                 <button 
                   onClick={() => setIsSearchOpen(true)}
-                  className="w-10 h-10 rounded-full bg-red-600/10 border border-red-600/30 flex items-center justify-center text-red-600 active:scale-75 transition-all"
+                  className="w-10 h-10 rounded-full bg-red-600/10 border border-red-600/30 flex items-center justify-center text-red-600 active:scale-75 transition-all shadow-[0_0_10px_rgba(220,38,38,0.2)]"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 </button>
@@ -146,7 +155,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, categoriesList, inter
           {/* الجانب الأيسر: زر التحديث (وجه الأسد) */}
           <button 
             onClick={onResetHistory}
-            className="w-12 h-12 flex items-center justify-center bg-black rounded-full border-2 border-red-600 shadow-[0_0_15px_red] active:scale-90 transition-all overflow-hidden p-1"
+            className="w-12 h-12 flex items-center justify-center bg-black rounded-full border-2 border-red-600 shadow-[0_0_15px_red] active:scale-90 transition-all overflow-hidden p-1 shrink-0"
           >
             <img src={LION_URL} className="w-full h-full object-contain filter drop-shadow-[0_0_5px_red]" alt="Refresh" />
           </button>
@@ -190,7 +199,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, categoriesList, inter
                     <div className="w-32 h-4 bg-white/10 rounded-full"></div>
                     <div className="flex gap-4 overflow-hidden">
                         {Array.from({length: 4}).map((_, j) => (
-                            <div key={j} className="flex-shrink-0 w-36 aspect-video bg-white/5 rounded-2xl ring-1 ring-red-600/30 shadow-[0_0_10px_red]"></div>
+                            <div key={j} className="flex-shrink-0 w-36 aspect-video bg-white/5 rounded-2xl ring-1 ring-red-600/50 shadow-[0_0_10px_red]"></div>
                         ))}
                     </div>
                 </div>

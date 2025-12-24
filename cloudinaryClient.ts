@@ -17,7 +17,7 @@ export const fetchCloudinaryVideos = async (): Promise<Video[]> => {
     
     const response = await fetch(targetUrl, {
       method: 'GET',
-      mode: 'cors'
+      mode: 'cors' // إضافة mode cors لتجنب حظر المتصفح
     });
 
     if (!response.ok) {
@@ -42,11 +42,10 @@ const mapCloudinaryData = (resources: any[]): Video[] => {
     const videoType: 'short' | 'long' = (res.height > res.width) ? 'short' : 'long';
     
     // بناء رابط HTTPS آمن ومحسن
-    // في قائمة الـ JSON، الرابط قد لا يكون كاملاً، لذا نبنيه يدوياً
     const baseUrl = `https://res.cloudinary.com/${CLOUD_NAME}/video/upload`;
     const optimizedUrl = `${baseUrl}/q_auto,f_auto/v${res.version}/${res.public_id}.${res.format}`;
     
-    // استخراج التصنيف من التاغات (باستثناء التاغ العام)
+    // استخراج التصنيف والعنوان من سياق البيانات أو التاغات
     const categoryTag = res.context?.custom?.caption || 'غموض';
     const title = res.context?.custom?.caption || 'فيديو مرعب';
 
@@ -63,11 +62,11 @@ const mapCloudinaryData = (resources: any[]): Video[] => {
     } as Video;
   });
 
+  // حفظ نسخة في التخزين المحلي لضمان الديمومة
   localStorage.setItem('app_videos_cache', JSON.stringify(mapped));
   return mapped;
 };
 
-// الدوال أدناه قد تحتاج لـ API Secret إذا تم تفعيلها، لكننا نركز الآن على الجلب والعرض
 export const deleteCloudinaryVideo = async (publicId: string) => {
   console.warn("Delete requires Admin API credentials.");
   return false;
