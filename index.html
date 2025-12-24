@@ -12,7 +12,6 @@
         font-family: 'Cairo', sans-serif;
         background-color: #050505;
         color: white;
-        overscroll-behavior: none;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
         margin: 0;
@@ -22,9 +21,6 @@
         -ms-user-select: none;
         user-select: none;
         -webkit-touch-callout: none;
-      }
-      html {
-        overscroll-behavior: none;
       }
       ::-webkit-scrollbar {
         display: none;
@@ -49,11 +45,22 @@
         0% { transform: translateX(0); }
         100% { transform: translateX(calc(100% + 1rem)); }
       }
+      
+      @keyframes marquee-scroll-reverse {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(calc(-100% - 1rem)); }
+      }
 
       .animate-marquee {
         display: flex;
         width: max-content;
         animation: marquee-scroll 40s linear infinite;
+      }
+      
+      .animate-marquee-reverse {
+        display: flex;
+        width: max-content;
+        animation: marquee-scroll-reverse 30s linear infinite;
       }
 
       .marquee-container {

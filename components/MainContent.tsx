@@ -103,24 +103,26 @@ const ScaryNeonLion = ({ colorClass }: { colorClass: string }) => (
   </svg>
 );
 
-const DraggableMarquee: React.FC<{ videos: Video[], interactions: UserInteractions, onPlay: (v: Video) => void, progressMap?: Map<string, number> }> = ({ videos, interactions, onPlay, progressMap }) => {
+const DraggableMarquee: React.FC<{ videos: Video[], interactions: UserInteractions, onPlay: (v: Video) => void, progressMap?: Map<string, number>, autoAnimate?: boolean, reverse?: boolean }> = ({ videos, interactions, onPlay, progressMap, autoAnimate, reverse }) => {
   return (
-    <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 snap-x">
-      {videos.map((v) => {
-        const id = v.id || v.video_url;
-        const progress = progressMap?.get(id) || 0;
-        const { isNew } = checkStatus(v, interactions);
-        return (
-          <div key={id} onClick={() => onPlay(v)} className="flex-shrink-0 w-36 snap-start active:scale-95 transition-all group relative">
-            <div className={`relative rounded-2xl overflow-hidden border border-white/5 bg-neutral-900 ${v.type === 'short' ? 'aspect-[9/16]' : 'aspect-video'}`}>
-              <video src={v.video_url} muted playsInline preload="metadata" className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
-              {isNew && <div className="absolute top-2 right-2 z-30 w-2 h-2 bg-red-600 rounded-full shadow-[0_0_8px_red] animate-pulse"></div>}
-              {progress > 0 && <div className="absolute bottom-0 left-0 w-full h-1 bg-white/10 z-20"><div className="h-full bg-red-600 shadow-[0_0_8px_red]" style={{ width: `${progress * 100}%` }}></div></div>}
+    <div className={`relative overflow-hidden w-full ${autoAnimate ? 'marquee-container' : ''}`}>
+      <div className={`flex gap-4 pb-2 snap-x ${autoAnimate ? (reverse ? 'animate-marquee-reverse' : 'animate-marquee') : 'overflow-x-auto scrollbar-hide'}`}>
+        {(autoAnimate ? [...videos, ...videos] : videos).map((v, i) => {
+          const id = v.id || v.video_url;
+          const progress = progressMap?.get(id) || 0;
+          const { isNew } = checkStatus(v, interactions);
+          return (
+            <div key={`${id}-${i}`} onClick={() => onPlay(v)} className="flex-shrink-0 w-36 snap-start active:scale-95 transition-all group relative">
+              <div className={`relative rounded-2xl overflow-hidden border border-white/10 bg-neutral-900 aspect-video shadow-[0_0_15px_rgba(255,255,255,0.05)]`}>
+                <video src={v.video_url} muted playsInline preload="metadata" className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
+                {isNew && <div className="absolute top-2 right-2 z-30 w-2 h-2 bg-red-600 rounded-full shadow-[0_0_8px_red] animate-pulse"></div>}
+                {progress > 0 && <div className="absolute bottom-0 left-0 w-full h-1 bg-white/10 z-20"><div className="h-full bg-red-600 shadow-[0_0_8px_red]" style={{ width: `${progress * 100}%` }}></div></div>}
+              </div>
+              <p className="text-[10px] font-black mt-2 line-clamp-1 px-1 text-gray-400 group-hover:text-white transition-colors text-right">{v.title}</p>
             </div>
-            <p className="text-[9px] font-black mt-2 line-clamp-1 px-1 text-gray-400 group-hover:text-white transition-colors text-right">{v.title}</p>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 };
@@ -143,6 +145,19 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
 
   const latestShorts = useMemo(() => allShorts.slice(0, 4), [allShorts]);
   const featuredLongs = useMemo(() => allLongs.slice(0, 4), [allLongs]);
+  const moreShorts = useMemo(() => allShorts.slice(4, 8), [allShorts]);
+  
+  const usedIds = useMemo(() => {
+    return new Set([
+      ...latestShorts.map(v => v.id || v.video_url),
+      ...featuredLongs.map(v => v.id || v.video_url),
+      ...moreShorts.map(v => v.id || v.video_url)
+    ]);
+  }, [latestShorts, featuredLongs, moreShorts]);
+
+  const remainingVideos = useMemo(() => {
+    return videos.filter(v => !usedIds.has(v.id || v.video_url)).slice(0, 10);
+  }, [videos, usedIds]);
 
   const unwatchedHistoryMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -161,8 +176,8 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
 
   if (loading && videos.length === 0) return (
     <div className="flex flex-col items-center justify-center p-20 min-h-[50vh]">
-      <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-      <p className="text-gray-500 font-bold mt-4 text-sm animate-pulse italic">يتم استدعاء الأرواح...</p>
+      <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin shadow-[0_0_20px_red]"></div>
+      <p className="text-gray-500 font-bold mt-6 text-xs animate-pulse italic tracking-widest">تتجسد الأرواح...</p>
     </div>
   );
 
@@ -173,14 +188,14 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
   };
 
   return (
-    <div className="flex flex-col gap-14 pb-4">
+    <div className="flex flex-col gap-10 pb-2">
       <section>
         <div className="flex items-center justify-between mb-6 px-1">
           <div onClick={onResetHistory} className="flex items-center gap-3 cursor-pointer group active:scale-95 transition-all">
-            <img src="https://i.top4top.io/p_3643ksmii1.jpg" className="w-10 h-10 rounded-full border-2 border-red-600 shadow-[0_0_15px_red] object-cover group-hover:shadow-[0_0_25px_red] transition-shadow" />
+            <img src="https://i.top4top.io/p_3643ksmii1.jpg" className="w-10 h-10 rounded-full border-2 border-red-600 shadow-[0_0_15px_red] object-cover" />
             <div className="flex flex-col">
               <h2 className="text-xl font-black text-red-600 italic leading-none">الحديقة المرعبة</h2>
-              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Devour All New Souls</span>
+              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Shuffle The Spirits</span>
             </div>
           </div>
           <div className="flex items-center justify-center pr-2">
@@ -195,13 +210,21 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </div>
       </section>
 
+      {/* قسم كم المشاهدة - يمر من الشمال لليمين بحجم موحد وجذاب */}
       {continueWatchingVideos.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-4 px-1">
             <h2 className="text-lg font-black text-white italic leading-none">واصل الارتعاش</h2>
             <button onClick={onViewUnwatched} className="text-[10px] text-yellow-500 font-black">عرض الكل</button>
           </div>
-          <DraggableMarquee videos={continueWatchingVideos} interactions={interactions} onPlay={(v) => v.type === 'short' ? onPlayShort(v, videos) : onPlayLong(v, allLongs, true)} progressMap={unwatchedHistoryMap} />
+          <DraggableMarquee 
+            videos={continueWatchingVideos} 
+            interactions={interactions} 
+            onPlay={(v) => v.type === 'short' ? onPlayShort(v, videos) : onPlayLong(v, allLongs, true)} 
+            progressMap={unwatchedHistoryMap}
+            autoAnimate={true}
+            reverse={true} 
+          />
         </section>
       )}
 
@@ -216,6 +239,35 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
           ))}
         </div>
       </section>
+
+      {moreShorts.length > 0 && (
+        <section>
+          <div className="flex items-center gap-3 mb-6 px-1">
+            <div className="w-2.5 h-8 bg-red-600 rounded-full shadow-[0_0_15px_red]"></div>
+            <h2 className="text-xl font-black text-white italic leading-none">نبضات قصيرة</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {moreShorts.map((v) => <VideoPreview key={v.id || v.video_url} video={v} interactions={interactions} onClick={() => onPlayShort(v, allShorts)} className="aspect-[9/16] rounded-[2rem] shadow-2xl" />)}
+          </div>
+        </section>
+      )}
+
+      {remainingVideos.length > 0 && (
+        <section className="mt-4">
+          <div className="flex items-center justify-between mb-4 px-1">
+            <h2 className="text-sm font-black text-gray-500 italic tracking-widest uppercase">اكتشافات عشوائية</h2>
+          </div>
+          <DraggableMarquee 
+            videos={remainingVideos} 
+            interactions={interactions} 
+            onPlay={(v) => v.type === 'short' ? onPlayShort(v, allShorts) : onPlayLong(v, allLongs, true)} 
+            autoAnimate={true}
+          />
+        </section>
+      )}
+
+      {/* مساحة فارغة للبنر الإعلاني للهواتف المحمولة - شفافة تماماً */}
+      <div className="h-[60px] w-full bg-transparent mb-6"></div>
     </div>
   );
 };

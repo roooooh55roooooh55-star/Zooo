@@ -28,9 +28,10 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
       
       const isLiked = interactions.likedIds.includes(vidId);
       const isSaved = interactions.savedIds.includes(vidId);
-      return !isLiked && !isSaved;
+      const isDisliked = interactions.dislikedIds.includes(vidId);
+      return !isLiked && !isSaved && !isDisliked;
     });
-  }, [videoList, interactions.likedIds, interactions.savedIds, initialVideo]);
+  }, [videoList, interactions.likedIds, interactions.savedIds, interactions.dislikedIds, initialVideo]);
 
   const [currentIndex, setCurrentIndex] = useState(() => {
     const idx = filteredList.findIndex(v => (v.id === initialVideo.id || v.video_url === initialVideo.video_url));
@@ -84,7 +85,6 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
       setCurrentIndex(nextIndex);
       containerRef.current?.scrollTo({ top: nextIndex * containerRef.current.clientHeight, behavior: 'smooth' });
     } else {
-      // العودة للبداية (دورة لا نهائية)
       setCurrentIndex(0);
       containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -103,6 +103,7 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
           const videoId = video.id || video.video_url;
           const stats = getDeterministicStats(video.video_url);
           const isLiked = interactions.likedIds.includes(videoId);
+          const isSaved = interactions.savedIds.includes(videoId);
 
           return (
             <div key={`${videoId}-${idx}`} className="h-full w-full snap-start relative bg-black flex items-center justify-center overflow-hidden">
@@ -122,13 +123,29 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
               />
               <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/80 pointer-events-none z-20" />
 
-              <div className="absolute bottom-32 left-6 flex flex-col items-center gap-6 z-30">
-                <button onClick={() => onLike(videoId)} className={`p-4 rounded-full border-2 transition-all ${isLiked ? 'bg-blue-600 border-blue-400 text-white shadow-[0_0_20px_blue]' : 'bg-black/40 border-white/20 text-white'}`}><svg className="w-6 h-6" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg></button>
-                <button onClick={() => onDislike(videoId)} className="p-4 rounded-full border-2 border-white/20 bg-black/40 text-white"><svg className="w-6 h-6 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg></button>
-                <button onClick={() => setIsMuted(!isMuted)} className="p-4 rounded-full border-2 border-white/20 bg-black/40 text-white">{isMuted ? '🔇' : '🔊'}</button>
+              <div className="absolute bottom-24 left-6 flex flex-col items-center gap-5 z-30">
+                {/* زر الإعجاب */}
+                <button onClick={() => onLike(videoId)} className={`p-4 rounded-full border-2 transition-all ${isLiked ? 'bg-blue-600 border-blue-400 text-white shadow-[0_0_20px_blue]' : 'bg-black/40 border-white/20 text-white'}`}>
+                  <svg className="w-6 h-6" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
+                </button>
+                
+                {/* زر الحفظ */}
+                <button onClick={() => onSave(videoId)} className={`p-4 rounded-full border-2 transition-all ${isSaved ? 'bg-yellow-500 border-yellow-400 text-white shadow-[0_0_20px_yellow]' : 'bg-black/40 border-white/20 text-white'}`}>
+                   <svg className="w-6 h-6" fill={isSaved ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                </button>
+
+                {/* زر كتم الصوت */}
+                <button onClick={() => setIsMuted(!isMuted)} className="p-4 rounded-full border-2 border-white/20 bg-black/40 text-white">
+                  {isMuted ? '🔇' : '🔊'}
+                </button>
+                
+                {/* زر التجاهل */}
+                <button onClick={() => onDislike(videoId)} className="p-4 rounded-full border-2 border-white/20 bg-black/40 text-white/40">
+                  <svg className="w-6 h-6 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
+                </button>
               </div>
 
-              <div className="absolute right-6 bottom-32 z-30 flex flex-col items-end gap-3 pointer-events-none text-right max-w-[70%]">
+              <div className="absolute right-6 bottom-24 z-30 flex flex-col items-end gap-3 pointer-events-none text-right max-w-[70%]">
                 <div className="flex items-center gap-2">
                    <span className="text-red-500 text-[10px] font-black italic drop-shadow-[0_0_5px_red]">الحديقة المرعبة</span>
                    <img src="https://i.top4top.io/p_3643ksmii1.jpg" alt="Logo" className="w-10 h-10 rounded-full border-2 border-red-600 shadow-[0_0_15px_red] object-cover" />

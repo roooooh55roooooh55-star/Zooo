@@ -20,7 +20,7 @@ const cacheVideoContent = async (url: string) => {
     const cache = await caches.open(CACHE_NAME);
     const cachedResponse = await cache.match(url);
     if (!cachedResponse) {
-      const response = await fetch(url, { mode: 'no-cors' }); // استخدام no-cors لضمان نجاح التخزين لبعض الروابط
+      const response = await fetch(url, { mode: 'no-cors' });
       if (response.ok || response.type === 'opaque') {
         await cache.put(url, response.clone());
         return true;
@@ -59,11 +59,7 @@ const App: React.FC = () => {
     try {
       const data = await fetchVideos(undefined, 800);
       if (data && data.length > 0) {
-        setRawVideos(prev => {
-          const prevIds = new Set(prev.map(v => v.id || v.video_url));
-          const newOnes = data.filter(v => !prevIds.has(v.id || v.video_url));
-          return [...newOnes, ...prev]; 
-        });
+        setRawVideos(data);
       }
     } catch (err) {
       console.error("Sync Error:", err);
@@ -78,12 +74,9 @@ const App: React.FC = () => {
     if (cacheStatus !== 'idle') return;
     setCacheStatus('caching');
     if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
-    
-    // تحميل أهم 50 فيديو فوراً للذاكرة العميقة للهاتف
     const pool = rawVideos.slice(0, 50);
     const promises = pool.map(v => cacheVideoContent(v.video_url));
     await Promise.all(promises);
-    
     setCacheStatus('done');
     if (navigator.vibrate) navigator.vibrate(150);
     setTimeout(() => setCacheStatus('idle'), 5000);
@@ -91,8 +84,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(() => loadData(true), 30000);
-    return () => clearInterval(interval);
   }, [loadData]);
 
   const updateWatchHistory = (id: string, progress: number) => {
@@ -107,12 +98,11 @@ const App: React.FC = () => {
     });
   };
 
-  const resetWatchHistory = useCallback(() => {
-    setInteractions(prev => ({ ...prev, watchHistory: [] }));
+  const handleRefreshFeed = useCallback(() => {
     setRefreshTrigger(prev => prev + 1);
-    loadData();
     if (navigator.vibrate) navigator.vibrate(50);
-  }, [loadData]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   const handlePlayShort = (v: Video, list: Video[]) => {
     updateWatchHistory(v.id || v.video_url, 0.01);
@@ -125,16 +115,33 @@ const App: React.FC = () => {
   };
 
   const homeVideos = useMemo(() => {
-    const filtered = rawVideos.filter(v => {
-      const vidId = v.id || v.video_url;
-      return !interactions.dislikedIds.includes(vidId);
+    if (rawVideos.length === 0) return [];
+    const watchedIds = new Set(interactions.watchHistory.filter(h => h.progress > 0.8).map(h => h.id));
+    const savedIdsSet = new Set(interactions.savedIds);
+    
+    // تصفية الفيديوهات: استبعاد المخفية واستبعاد المحفوظة (خاصة الشورتس)
+    let pool = rawVideos.filter(v => {
+      const id = v.id || v.video_url;
+      // استبعاد الفيديوهات المستبعدة يدوياً
+      if (interactions.dislikedIds.includes(id)) return false;
+      // استبعاد الفيديوهات المحفوظة لضمان عدم تكرارها في الصفحة الرئيسية
+      if (savedIdsSet.has(id)) return false;
+      return true;
     });
-    return [...filtered].sort((a, b) => {
-       const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-       const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-       return dateB - dateA;
-    });
-  }, [rawVideos, interactions.dislikedIds, refreshTrigger]);
+
+    const unwatched = pool.filter(v => !watchedIds.has(v.id || v.video_url));
+    const watched = pool.filter(v => watchedIds.has(v.id || v.video_url));
+
+    const shuffle = (array: Video[]) => {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
+    return [...shuffle(unwatched), ...shuffle(watched)];
+  }, [rawVideos, interactions.dislikedIds, interactions.savedIds, interactions.watchHistory, refreshTrigger]);
 
   const allLongsPool = useMemo(() => rawVideos.filter(v => v.type === 'long'), [rawVideos]);
 
@@ -145,6 +152,13 @@ const App: React.FC = () => {
       likedIds: isLiked ? prev.likedIds.filter(v => v !== id) : [...prev.likedIds, id]
     }));
     try { await updateLikesInDB(id, !isLiked); } catch (e) {}
+  };
+
+  const handleToggleSave = (id: string) => {
+    setInteractions(prev => ({
+      ...prev,
+      savedIds: prev.savedIds.includes(id) ? prev.savedIds.filter(v => v !== id) : [...prev.savedIds, id]
+    }));
   };
 
   const renderContent = () => {
@@ -170,7 +184,7 @@ const App: React.FC = () => {
             onPlayShort={handlePlayShort}
             onPlayLong={(v, list) => handlePlayLong(v, list)}
             onViewUnwatched={() => setCurrentView(AppView.UNWATCHED)}
-            onResetHistory={resetWatchHistory}
+            onResetHistory={handleRefreshFeed}
             onTurboCache={handleTurboCache}
             cacheStatus={cacheStatus}
             loading={loading && rawVideos.length === 0}
@@ -181,27 +195,40 @@ const App: React.FC = () => {
 
   return (
     <div 
-      className="min-h-screen pb-20 max-w-md mx-auto relative bg-[#050505]"
-      onTouchStart={(e) => { if (window.scrollY === 0) touchStart.current = e.touches[0].clientY; }}
+      className="min-h-screen pb-4 max-w-md mx-auto relative bg-[#050505] touch-pan-y"
+      onTouchStart={(e) => { 
+        if (window.scrollY <= 1) touchStart.current = e.touches[0].clientY; 
+      } }
       onTouchMove={(e) => {
-        if (window.scrollY === 0 && touchStart.current > 0) {
+        if (window.scrollY <= 1 && touchStart.current > 0) {
           const diff = e.touches[0].clientY - touchStart.current;
-          if (diff > 0) setPullDistance(Math.min(diff / 2, 80));
+          if (diff > 10) { 
+            setPullDistance(Math.min(diff / 2, 70));
+          }
+        } else {
+          // إذا لم نكن في الأعلى، نقوم بتصفير touchStart للسماح بالتمرير الطبيعي
+          touchStart.current = 0;
         }
       }}
       onTouchEnd={() => {
-        if (pullDistance > 60) {
+        if (pullDistance > 55) {
           setRefreshing(true);
-          resetWatchHistory();
-        } else setPullDistance(0);
+          handleRefreshFeed();
+          // تختفي علامة التحميل فوراً لبدء التحديث
+          setPullDistance(0);
+          setTimeout(() => setRefreshing(false), 800);
+        } else {
+          setPullDistance(0);
+        }
         touchStart.current = 0;
       }}
     >
-      <AppBar onViewChange={setCurrentView} onRefresh={resetWatchHistory} currentView={currentView} />
+      <AppBar onViewChange={setCurrentView} onRefresh={handleRefreshFeed} currentView={currentView} />
       
-      <div className="fixed left-0 right-0 z-[60] flex justify-center transition-all pointer-events-none" style={{ top: `${pullDistance + 10}px`, opacity: pullDistance / 60 }}>
-        <div className={`p-2 bg-red-600 rounded-full shadow-[0_0_20px_red] ${refreshing ? 'animate-spin' : ''}`}>
-          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+      {/* علامة التحميل تظهر فقط أثناء السحب وتختفي فوراً عند الإفلات */}
+      <div className="fixed left-0 right-0 z-[60] flex justify-center transition-all pointer-events-none" style={{ top: `${pullDistance + 10}px`, opacity: pullDistance / 55 }}>
+        <div className={`p-2 bg-red-600 rounded-full shadow-[0_0_25px_red] ${refreshing || pullDistance < 10 ? 'scale-0' : 'scale-100'}`}>
+          <svg className="w-5 h-5 text-white animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4"><path d="M19 9l-7 7-7-7" /></svg>
         </div>
       </div>
 
@@ -216,7 +243,7 @@ const App: React.FC = () => {
           onClose={() => setSelectedShort(null)} 
           onLike={handleToggleLike} 
           onDislike={(id) => setInteractions(prev => ({ ...prev, dislikedIds: [...prev.dislikedIds, id] }))} 
-          onSave={(id) => setInteractions(prev => ({ ...prev, savedIds: prev.savedIds.includes(id) ? prev.savedIds.filter(v => v !== id) : [...prev.savedIds, id] }))} 
+          onSave={handleToggleSave} 
           onProgress={updateWatchHistory}
           onAllEnded={() => setSelectedShort(null)}
         />
@@ -229,10 +256,7 @@ const App: React.FC = () => {
           onClose={() => setSelectedLong(null)}
           onLike={() => handleToggleLike(selectedLong.video.id || selectedLong.video.video_url)}
           onDislike={() => setInteractions(prev => ({ ...prev, dislikedIds: [...prev.dislikedIds, (selectedLong.video.id || selectedLong.video.video_url)] }))}
-          onSave={() => setInteractions(prev => {
-            const id = selectedLong.video.id || selectedLong.video.video_url;
-            return { ...prev, savedIds: prev.savedIds.includes(id) ? prev.savedIds.filter(v => v !== id) : [...prev.savedIds, id] };
-          })}
+          onSave={() => handleToggleSave(selectedLong.video.id || selectedLong.video.video_url)}
           onSwitchVideo={(v) => {
             updateWatchHistory(v.id || v.video_url, 0.01);
             setSelectedLong({ video: v, list: selectedLong.list });
