@@ -26,13 +26,11 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
   const videoRefs = useRef<{ [key: number]: HTMLVideoElement | null }>({});
 
   useEffect(() => {
-    const currentVideo = videoList[currentIndex];
     const vid = videoRefs.current[currentIndex];
     if (vid) {
       vid.play().catch(() => { vid.muted = true; vid.play(); });
     }
     
-    // إيقاف الفيديوهات الأخرى لتوفير الباندويث
     Object.keys(videoRefs.current).forEach((key) => {
       const idx = parseInt(key);
       if (idx !== currentIndex) videoRefs.current[idx]?.pause();
@@ -64,15 +62,17 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
           const stats = getDeterministicStats(video.video_url);
           return (
             <div key={`${video.id}-${idx}`} className="h-full w-full snap-start relative bg-black flex items-center justify-center">
-              <video 
-                ref={el => { videoRefs.current[idx] = el; }}
-                src={video.video_url} 
-                className="h-full w-full object-cover"
-                playsInline 
-                loop
-                preload="auto"
-                onTimeUpdate={(e) => idx === currentIndex && onProgress(video.id, e.currentTarget.currentTime / e.currentTarget.duration)}
-              />
+              <div className="relative h-full w-full ring-2 ring-red-600/30 shadow-[inset_0_0_100px_rgba(220,38,38,0.2)]">
+                <video 
+                    ref={el => { videoRefs.current[idx] = el; }}
+                    src={video.video_url} 
+                    className="h-full w-full object-cover"
+                    playsInline 
+                    loop
+                    preload="auto"
+                    onTimeUpdate={(e) => idx === currentIndex && onProgress(video.id, e.currentTarget.currentTime / e.currentTarget.duration)}
+                />
+              </div>
               
               <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80 pointer-events-none z-20" />
 

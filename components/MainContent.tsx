@@ -3,6 +3,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Video, UserInteractions } from '../types.ts';
 
 const LOGO_URL = "https://i.top4top.io/p_3643ksmii1.jpg";
+const LION_URL = "https://cdn-icons-png.flaticon.com/512/616/616412.png"; // أيقونة وجه أسد احترافية
 
 export const getDeterministicStats = (url: string) => {
   let hash = 0;
@@ -20,21 +21,18 @@ export const formatBigNumber = (num: number) => {
 };
 
 const DraggableMarquee: React.FC<{ videos: Video[], interactions: UserInteractions, onPlay: (v: Video) => void, progressMap?: Map<string, number>, autoAnimate?: boolean, reverse?: boolean }> = ({ videos, interactions, onPlay, progressMap, autoAnimate, reverse }) => {
-  const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
 
   const displayVideos = useMemo(() => {
-    if (!Array.isArray(videos) || videos.length === 0) return [];
+    if (!Array.isArray(videos) || videos.length === 0) return Array.from({length: 4}); // هياكل فارغة للتقسيم
     if (!autoAnimate) return videos;
     return [...videos, ...videos];
   }, [videos, autoAnimate]);
 
   const animationDuration = useMemo(() => {
-    const count = Array.isArray(videos) ? videos.length : 1;
+    const count = Array.isArray(videos) ? videos.length : 4;
     return Math.max(8, (count / 10) * 12);
   }, [videos]);
-
-  if (displayVideos.length === 0) return null;
 
   return (
     <div className="relative marquee-container w-full overflow-hidden" onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)}>
@@ -43,15 +41,20 @@ const DraggableMarquee: React.FC<{ videos: Video[], interactions: UserInteractio
         className={`flex gap-4 pb-4 px-2 ${autoAnimate ? (reverse ? 'animate-marquee-l-to-r' : 'animate-marquee-r-to-l') : 'overflow-x-auto scrollbar-hide'}`}
       >
         {displayVideos.map((v, i) => {
-          const id = v.id || v.video_url;
+          if (!v) return (
+            <div key={i} className="flex-shrink-0 w-36 aspect-video rounded-2xl bg-white/5 ring-1 ring-red-600/30 shadow-[0_0_10px_rgba(220,38,38,0.2)]"></div>
+          );
+          
+          const video = v as Video;
+          const id = video.id || video.video_url;
           const progress = progressMap?.get(id) || 0;
           return (
-            <div key={`${id}-${i}`} onClick={() => onPlay(v)} className="flex-shrink-0 w-36 active:scale-95 transition-all group relative">
-              <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-neutral-900 aspect-video">
-                <video src={v.video_url} muted playsInline preload="metadata" className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
+            <div key={`${id}-${i}`} onClick={() => onPlay(video)} className="flex-shrink-0 w-36 active:scale-95 transition-all group relative">
+              <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-neutral-900 aspect-video ring-1 ring-red-600/40 shadow-[0_0_8px_rgba(220,38,38,0.3)] group-hover:ring-red-600 group-hover:shadow-[0_0_15px_red] transition-all">
+                <video src={video.video_url} muted playsInline preload="metadata" className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
                 {progress > 0 && <div className="absolute bottom-0 left-0 w-full h-1 bg-white/10 z-20"><div className="h-full bg-red-600 shadow-[0_0_8px_red]" style={{ width: `${progress * 100}%` }}></div></div>}
               </div>
-              <p className="text-[10px] font-black mt-2 line-clamp-1 px-1 text-gray-400 group-hover:text-white transition-colors text-right">{v.title}</p>
+              <p className="text-[10px] font-black mt-2 line-clamp-1 px-1 text-gray-400 group-hover:text-white transition-colors text-right">{video.title}</p>
             </div>
           );
         })}
@@ -104,28 +107,49 @@ const MainContent: React.FC<MainContentProps> = ({ videos, categoriesList, inter
   }, [safeVideos, unwatchedHistoryMap]);
 
   return (
-    <div className="flex flex-col gap-10 pb-2">
-      <section>
-        <div className="flex items-center justify-between mb-6 px-1">
+    <div className="flex flex-col gap-10 pb-2" dir="rtl">
+      {/* هيدر الصفحة الرئيسي المحدث */}
+      <section className="px-1 pt-4">
+        <div className="flex items-center justify-between">
+          {/* الجانب الأيمن: اللوجو والعنوان */}
           <div onClick={onResetHistory} className="flex items-center gap-3 cursor-pointer group active:scale-95 transition-all">
             <img src={LOGO_URL} className="w-10 h-10 rounded-full border-2 border-red-600 shadow-[0_0_15px_red] object-cover" />
-            <div className="flex flex-col">
+            <div className="flex flex-col text-right">
               <h2 className="text-xl font-black text-red-600 italic leading-none">الحديقة المرعبة</h2>
-              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Spirits Collection</span>
+              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Dark Spirits Folder</span>
             </div>
           </div>
-          
-          <div className="flex items-center gap-4">
-            {isSearchOpen ? (
-              <div className="flex items-center bg-white/5 border border-red-600/30 rounded-xl px-3 py-1 animate-in slide-in-from-left-4 duration-300">
-                <input autoFocus className="bg-transparent outline-none text-xs text-white w-24 text-right" placeholder="ابحث..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onBlur={() => !searchQuery && setIsSearchOpen(false)} />
-              </div>
-            ) : (
-              <button onClick={() => setIsSearchOpen(true)} className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-red-500 active:scale-75 transition-all">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-              </button>
-            )}
+
+          {/* المنتصف: زر البحث */}
+          <div className="flex-grow flex justify-center px-4">
+             {isSearchOpen ? (
+                <div className="w-full flex items-center bg-white/5 border border-red-600/50 rounded-2xl px-4 py-2 animate-in zoom-in duration-300">
+                    <input 
+                      autoFocus 
+                      className="bg-transparent outline-none text-xs text-white w-full text-right" 
+                      placeholder="ابحث عن روح..." 
+                      value={searchQuery} 
+                      onChange={(e) => setSearchQuery(e.target.value)} 
+                      onBlur={() => !searchQuery && setIsSearchOpen(false)}
+                    />
+                </div>
+             ) : (
+                <button 
+                  onClick={() => setIsSearchOpen(true)}
+                  className="w-10 h-10 rounded-full bg-red-600/10 border border-red-600/30 flex items-center justify-center text-red-600 active:scale-75 transition-all"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </button>
+             )}
           </div>
+
+          {/* الجانب الأيسر: زر التحديث (وجه الأسد) */}
+          <button 
+            onClick={onResetHistory}
+            className="w-12 h-12 flex items-center justify-center bg-black rounded-full border-2 border-red-600 shadow-[0_0_15px_red] active:scale-90 transition-all overflow-hidden p-1"
+          >
+            <img src={LION_URL} className="w-full h-full object-contain filter drop-shadow-[0_0_5px_red]" alt="Refresh" />
+          </button>
         </div>
       </section>
 
@@ -143,16 +167,36 @@ const MainContent: React.FC<MainContentProps> = ({ videos, categoriesList, inter
       )}
 
       {Object.entries(categoriesData).map(([name, list]) => (
-        list.length > 0 && (
-          <section key={name}>
-            <div className="flex items-center gap-3 mb-4 px-1">
-              <img src={LOGO_URL} className="w-6 h-6 rounded-full border-2 border-red-600 shadow-[0_0_8px_red]" />
-              <h2 className="text-xl font-black text-white italic leading-none">{name}</h2>
-            </div>
-            <DraggableMarquee videos={list} interactions={interactions} onPlay={(v) => v.type === 'short' ? onPlayShort(v, list) : onPlayLong(v, list, true)} autoAnimate={true} reverse={name.length % 2 === 0} />
-          </section>
-        )
+        <section key={name} className="mb-2">
+          <div className="flex items-center gap-3 mb-4 px-1">
+            <img src={LOGO_URL} className="w-6 h-6 rounded-full border-2 border-red-600 shadow-[0_0_8px_red]" />
+            <h2 className="text-xl font-black text-white italic leading-none">{name}</h2>
+          </div>
+          <DraggableMarquee 
+            videos={list} 
+            interactions={interactions} 
+            onPlay={(v) => v.type === 'short' ? onPlayShort(v, list) : onPlayLong(v, list, true)} 
+            autoAnimate={true} 
+            reverse={name.length % 2 === 0} 
+          />
+        </section>
       ))}
+      
+      {/* تقسيم إضافي في حالة عدم وجود محتوى */}
+      {safeVideos.length === 0 && !loading && (
+        <div className="flex flex-col gap-10 opacity-20 px-2">
+            {Array.from({length: 3}).map((_, i) => (
+                <div key={i} className="flex flex-col gap-4">
+                    <div className="w-32 h-4 bg-white/10 rounded-full"></div>
+                    <div className="flex gap-4 overflow-hidden">
+                        {Array.from({length: 4}).map((_, j) => (
+                            <div key={j} className="flex-shrink-0 w-36 aspect-video bg-white/5 rounded-2xl ring-1 ring-red-600/30 shadow-[0_0_10px_red]"></div>
+                        ))}
+                    </div>
+                </div>
+            ))}
+        </div>
+      )}
     </div>
   );
 };

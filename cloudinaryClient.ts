@@ -2,42 +2,28 @@
 import { Video } from './types';
 
 const CLOUD_NAME = 'dlrvn33p0'.trim();
-const API_KEY = '392293291257757'.trim();
-const API_SECRET = 'UPSWtjj8T4Vj4x6O_oE-0V3f_8c'.trim();
-
-// استخدام بروكسي متطور يدعم كافة أنواع الطلبات ويهرب من قيود CORS
-const PROXY_URL = 'https://corsproxy.io/?';
-
-const getAuthHeader = () => {
-  try {
-    const credentials = btoa(`${API_KEY}:${API_SECRET}`);
-    return `Basic ${credentials}`;
-  } catch (e) {
-    return '';
-  }
-};
+// ملاحظة: تم الانتقال لاستخدام قائمة الـ JSON العامة لتجنب أخطاء المصادقة 401
+// يجب تفعيل "Resource List" في إعدادات Security في Cloudinary ليعمل هذا الرابط
+const COMMON_TAG = 'hadiqa_v4';
 
 /**
- * جلب الفيديوهات باستخدام Resources API مع التركيز على مجلد app_videos
+ * جلب الفيديوهات باستخدام القائمة العامة (JSON) لتجنب أخطاء الـ API Secret
  */
 export const fetchCloudinaryVideos = async (): Promise<Video[]> => {
   try {
     const timestamp = new Date().getTime();
-    // استخدام Resources API (Admin API) لجلب الملفات من مجلد محدد
-    // تم إضافة prefix=app_videos لضمان أننا لا نجلب إلا ما هو داخل المجلد المطلوب
-    const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/video?max_results=500&context=true&tags=true&prefix=app_videos/&type=upload&t=${timestamp}`;
+    // الرابط المباشر للقائمة (يعمل فقط إذا تم تفعيل Resource List في الإعدادات)
+    const targetUrl = `https://res.cloudinary.com/${CLOUD_NAME}/video/list/${COMMON_TAG}.json?t=${timestamp}`;
     
-    const response = await fetch(`${PROXY_URL}${encodeURIComponent(targetUrl)}`, {
+    const response = await fetch(targetUrl, {
       method: 'GET',
-      mode: 'cors',
-      headers: {
-        'Authorization': getAuthHeader(),
-        'Accept': 'application/json',
-      }
+      mode: 'cors'
     });
 
     if (!response.ok) {
-      throw new Error(`Cloudinary API returned ${response.status}`);
+      console.warn("Public JSON list failed (check Resource List setting). Falling back to local cache.");
+      const cached = localStorage.getItem('app_videos_cache');
+      return cached ? JSON.parse(cached) : [];
     }
 
     const data = await response.json();
@@ -46,7 +32,6 @@ export const fetchCloudinaryVideos = async (): Promise<Video[]> => {
     return mapCloudinaryData(resources);
   } catch (error) {
     console.error('Fetch Error:', error);
-    // محاولة استعادة البيانات من الكاش المحلي في حال فشل الشبكة تماماً
     const cached = localStorage.getItem('app_videos_cache');
     return cached ? JSON.parse(cached) : [];
   }
@@ -56,23 +41,21 @@ const mapCloudinaryData = (resources: any[]): Video[] => {
   const mapped = resources.map((res: any) => {
     const videoType: 'short' | 'long' = (res.height > res.width) ? 'short' : 'long';
     
-    // ضمان استخدام HTTPS في كل الروابط
-    const secureUrl = (res.secure_url || res.url).replace('http://', 'https://');
+    // بناء رابط HTTPS آمن ومحسن
+    // في قائمة الـ JSON، الرابط قد لا يكون كاملاً، لذا نبنيه يدوياً
+    const baseUrl = `https://res.cloudinary.com/${CLOUD_NAME}/video/upload`;
+    const optimizedUrl = `${baseUrl}/q_auto,f_auto/v${res.version}/${res.public_id}.${res.format}`;
     
-    // تحسين الأداء عبر التحويل التلقائي للجودة والصيغة
-    const optimizedUrl = secureUrl.replace('/upload/', '/upload/q_auto,f_auto/');
-    
-    const categoryTag = res.tags?.[0] || 'غموض';
-    const caption = res.context?.custom?.caption || res.context?.caption || 
-                    res.public_id.split('/').pop()?.replace(/_/g, ' ') || 
-                    'فيديو مرعب';
+    // استخراج التصنيف من التاغات (باستثناء التاغ العام)
+    const categoryTag = res.context?.custom?.caption || 'غموض';
+    const title = res.context?.custom?.caption || 'فيديو مرعب';
 
     return {
       id: res.public_id,
       public_id: res.public_id,
       video_url: optimizedUrl,
       type: videoType,
-      title: caption,
+      title: title,
       likes: 0,
       views: 0,
       category: categoryTag,
@@ -80,42 +63,17 @@ const mapCloudinaryData = (resources: any[]): Video[] => {
     } as Video;
   });
 
-  // تحديث الكاش المحلي لضمان استمرارية العرض دون انقطاع
   localStorage.setItem('app_videos_cache', JSON.stringify(mapped));
   return mapped;
 };
 
+// الدوال أدناه قد تحتاج لـ API Secret إذا تم تفعيلها، لكننا نركز الآن على الجلب والعرض
 export const deleteCloudinaryVideo = async (publicId: string) => {
-  try {
-    const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/video/upload?public_ids[]=${encodeURIComponent(publicId)}`;
-    const response = await fetch(`${PROXY_URL}${encodeURIComponent(targetUrl)}`, {
-      method: 'DELETE',
-      mode: 'cors',
-      headers: { 'Authorization': getAuthHeader() }
-    });
-    return response.ok;
-  } catch (error) {
-    return false;
-  }
+  console.warn("Delete requires Admin API credentials.");
+  return false;
 };
 
 export const updateCloudinaryMetadata = async (publicId: string, title: string, category: string) => {
-  try {
-    const tagUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/tags`;
-    const tagParams = new URLSearchParams();
-    tagParams.set('tags', category);
-    tagParams.set('public_ids', publicId);
-    tagParams.set('command', 'replace');
-
-    const response = await fetch(`${PROXY_URL}${encodeURIComponent(tagUrl)}`, {
-      method: 'POST',
-      mode: 'cors',
-      headers: { 'Authorization': getAuthHeader() },
-      body: tagParams
-    });
-
-    return response.ok;
-  } catch (error) {
-    return false;
-  }
+  console.warn("Update requires Admin API credentials.");
+  return false;
 };
