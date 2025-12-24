@@ -11,9 +11,10 @@ interface AdminDashboardProps {
   onUpdatePassword: (pass: string) => void;
   categories: string[];
   onUpdateCategories: (cats: string[]) => void;
+  onNewVideo?: (v: Video) => void;
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPassword, onUpdatePassword, categories, onUpdateCategories }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPassword, onUpdatePassword, categories, onUpdateCategories, onNewVideo }) => {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
@@ -47,7 +48,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
       if (ok) {
         loadVideos();
       } else {
-        alert('حدث خطأ في الطقوس.. حاول مرة أخرى.');
+        alert('حدث خطأ في الاتصال.. حاول مرة أخرى.');
       }
       setIsProcessing(null);
     }
@@ -78,11 +79,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
   const openUploadWidget = () => {
     const cloudinary = (window as any).cloudinary;
     if (!cloudinary) {
-      alert("النظام غير جاهز.. انتظر قليلاً.");
+      alert("النظام السحابي غير مستعد.. انتظر ثوانٍ.");
       return;
     }
     if (!uploadTitle.trim()) {
-      alert("الروح تحتاج اسماً للمرور.");
+      alert("الروح تحتاج اسماً للمرور عبر البوابة.");
       return;
     }
 
@@ -101,19 +102,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
       (error: any, result: any) => {
         if (!error && result && result.event === "success") {
           setIsUploading(false);
+          
+          // تأكيد الرابط عبر HTTPS
+          const secureUrl = result.info.secure_url.replace('http://', 'https://');
+
           const newVideo: Video = {
               id: result.info.public_id,
               public_id: result.info.public_id,
-              video_url: result.info.secure_url,
+              video_url: secureUrl,
               title: uploadTitle,
               category: uploadCategory,
               type: result.info.height > result.info.width ? 'short' : 'long',
               likes: 0,
               views: 0
           };
+
+          // تحديث المعاينة الفورية
           setLastUploaded(newVideo);
+          
+          // إبلاغ المكون الرئيسي بإضافة الفيديو فوراً
+          if (onNewVideo) onNewVideo(newVideo);
+          
           setUploadTitle('');
-          loadVideos(); // تحديث القائمة فوراً
+          // لا حاجة لانتظار loadVideos هنا لأننا أضفناه محلياً
+          setVideos(prev => [newVideo, ...prev]);
         } else if (result && result.event === "close") {
           setIsUploading(false);
         }
@@ -136,11 +148,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
         </button>
       </div>
 
-      {/* معاينة الرفع الأخير */}
+      {/* معاينة الرفع الأخير - التأكد من عمله قبل العودة للرئيسية */}
       {lastUploaded && (
         <div className="mb-10 animate-in zoom-in fade-in duration-500">
-           <div className="bg-red-600/10 border-2 border-red-600 rounded-[2.5rem] p-6 relative overflow-hidden">
-             <div className="absolute top-0 left-0 bg-red-600 text-white text-[8px] font-black px-4 py-1 rounded-br-2xl uppercase tracking-tighter">رفع ناجح - قيد المعاينة</div>
+           <div className="bg-green-600/10 border-2 border-green-600/50 rounded-[2.5rem] p-6 relative overflow-hidden">
+             <div className="absolute top-0 left-0 bg-green-600 text-white text-[8px] font-black px-4 py-1 rounded-br-2xl uppercase">تم التحميل بنجاح</div>
              <div className="flex flex-col gap-4">
                 <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black border border-white/10 shadow-2xl">
                     <video src={lastUploaded.video_url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
@@ -149,7 +161,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
                     <h3 className="text-lg font-black text-white">{lastUploaded.title}</h3>
                     <p className="text-[10px] text-gray-500 font-bold italic">التصنيف: {lastUploaded.category}</p>
                 </div>
-                <button onClick={() => setLastUploaded(null)} className="w-full py-3 bg-red-600/20 text-red-500 font-black rounded-xl border border-red-600/30 text-xs">تأكيد ومتابعة</button>
+                <button onClick={() => setLastUploaded(null)} className="w-full py-3 bg-green-600/20 text-green-500 font-black rounded-xl border border-green-600/30 text-xs">تأكيد الاعتماد</button>
              </div>
            </div>
         </div>
@@ -219,17 +231,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
         </button>
       </div>
 
-      {/* المكتبة */}
+      {/* المكتبة السحابية */}
       <div className="space-y-6">
         <div className="flex items-center justify-between px-2">
             <h2 className="text-xl font-black text-white italic">الأرشيف السحابي <span className="text-red-600">({videos.length})</span></h2>
-            <button onClick={loadVideos} className="text-red-500 text-[10px] font-black tracking-widest uppercase hover:underline">Refetch ↻</button>
+            <button onClick={loadVideos} className="text-red-500 text-[10px] font-black tracking-widest uppercase hover:underline">تحديث القائمة ↻</button>
         </div>
         
         {loading ? (
           <div className="py-20 flex flex-col items-center gap-6">
             <div className="w-10 h-10 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-gray-600 text-[10px] font-black uppercase tracking-widest">Syncing Records...</p>
+            <p className="text-gray-600 text-[10px] font-black uppercase tracking-widest">مزامنة السجلات...</p>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
@@ -262,7 +274,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
                     onClick={() => handleDelete(v.public_id)}
                     className="px-6 py-2 bg-red-600/10 text-red-500 text-[10px] font-black rounded-xl border border-red-600/20 active:scale-95 transition-all"
                     >
-                    حذف كلي
+                    حذف من السحابة
                     </button>
                 </div>
                 </div>
