@@ -7,6 +7,8 @@
     <title>الحديقة - Al-Hadiqa</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- مكتبة Cloudinary للرفع -->
+    <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
     <style>
       body {
         font-family: 'Cairo', sans-serif;
@@ -55,50 +57,6 @@
         animation: marquee-l-to-r 12s linear infinite;
       }
       
-      .animate-marquee-r-to-l {
-        display: flex;
-        width: max-content;
-        animation: marquee-r-to-l 12s linear infinite;
-      }
-
-      .marquee-container {
-        mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
-        -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
-        overflow: hidden;
-      }
-
-      /* ألوان نيون فائقة السطوع (Ultra Bright Neon) مع تأثير Bloom */
-      .neon-btn-blue { 
-        box-shadow: 0 0 30px #3b82f6, 0 0 60px rgba(59, 130, 246, 0.4), inset 0 0 20px #3b82f6; 
-        border-color: #93c5fd !important; 
-        border-width: 2.5px;
-        filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.8));
-      }
-      .neon-btn-red { 
-        box-shadow: 0 0 30px #ef4444, 0 0 60px rgba(239, 68, 68, 0.4), inset 0 0 20px #ef4444; 
-        border-color: #fca5a5 !important; 
-        border-width: 2.5px;
-        filter: drop-shadow(0 0 15px rgba(239, 68, 68, 0.8));
-      }
-      .neon-btn-yellow { 
-        box-shadow: 0 0 30px #eab308, 0 0 60px rgba(234, 179, 8, 0.4), inset 0 0 20px #eab308; 
-        border-color: #fde047 !important; 
-        border-width: 2.5px;
-        filter: drop-shadow(0 0 15px rgba(234, 179, 8, 0.8));
-      }
-      .neon-btn-green { 
-        box-shadow: 0 0 40px #22c55e, 0 0 80px rgba(34, 197, 94, 0.5), inset 0 0 25px #22c55e; 
-        border-color: #86efac !important; 
-        border-width: 3px;
-        filter: drop-shadow(0 0 20px rgba(34, 197, 94, 0.9));
-      }
-      .neon-btn-purple { 
-        box-shadow: 0 0 30px #a855f7, 0 0 60px rgba(168, 85, 247, 0.4), inset 0 0 20px #a855f7; 
-        border-color: #d8b4fe !important; 
-        border-width: 2.5px;
-        filter: drop-shadow(0 0 15px rgba(168, 85, 247, 0.8));
-      }
-
       @keyframes spin-slow {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
@@ -110,23 +68,6 @@
         50% { transform: scale(1.08); opacity: 0.9; filter: brightness(1.5); }
       }
       .animate-pulse-fast { animation: pulse-fast 0.8s ease-in-out infinite; }
-      
-      /* تأثير لمعان للزراير المفعلة */
-      .neon-active-shine::after {
-        content: '';
-        position: absolute;
-        top: -50%;
-        left: -50%;
-        width: 200%;
-        height: 200%;
-        background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
-        transform: rotate(45deg);
-        animation: shine-move 3s infinite;
-      }
-      @keyframes shine-move {
-        0% { transform: translateX(-100%) rotate(45deg); }
-        100% { transform: translateX(100%) rotate(45deg); }
-      }
     </style>
   <script type="importmap">
 {

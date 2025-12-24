@@ -18,6 +18,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
   const [showPassSettings, setShowPassSettings] = useState(false);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
+  // حقول الرفع المسبق
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadCategory, setUploadCategory] = useState(CATEGORIES[0]);
+
   const loadVideos = async () => {
     setLoading(true);
     const data = await fetchCloudinaryVideos();
@@ -35,7 +39,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
         alert('تم الحذف بنجاح');
         loadVideos();
       } else {
-        alert('فشل الحذف. تأكد من اتصال الإنترنت.');
+        alert('فشل الحذف. تأكد من اتصال الإنترنت أو البروكسي.');
       }
       setIsProcessing(null);
     }
@@ -52,30 +56,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
 
   const handleUpdatePassword = () => {
     if (newPassInput.length < 4) {
-      alert("الرمز قصير جداً.. اجعله مرعباً أكثر!");
+      alert("الرمز قصير جداً!");
       return;
     }
     onUpdatePassword(newPassInput);
-    alert("تم تحديث رمز العبور بنجاح.");
+    alert("تم التحديث.");
     setShowPassSettings(false);
   };
 
   const openUploadWidget = () => {
-    if (!(window as any).cloudinary) {
-      alert("جاري تحميل أداة الرفع.. انتظر ثوانٍ");
+    const cloudinary = (window as any).cloudinary;
+    if (!cloudinary) {
+      alert("خطأ: مكتبة الرفع لم تتحمل بعد. أعد تحميل الصفحة.");
       return;
     }
-    (window as any).cloudinary.openUploadWidget(
+
+    if (!uploadTitle.trim()) {
+      alert("يرجى كتابة عنوان للفيديو قبل الرفع لضمان حفظه بشكل صحيح.");
+      return;
+    }
+
+    cloudinary.openUploadWidget(
       {
         cloudName: 'dlrvn33p0',
         uploadPreset: 'Good.zooo',
         sources: ['local', 'url', 'camera'],
         resourceType: 'video',
-        clientAllowedFormats: ['mp4', 'mov', 'avi']
+        clientAllowedFormats: ['mp4', 'mov', 'avi'],
+        // تمرير البيانات مباشرة أثناء الرفع لتجنب أخطاء البروكسي لاحقاً
+        context: { caption: uploadTitle },
+        tags: [uploadCategory],
+        maxFiles: 1
       },
       (error: any, result: any) => {
         if (!error && result && result.event === "success") {
-          loadVideos();
+          alert(`تم رفع "${uploadTitle}" بنجاح!`);
+          setUploadTitle(''); // إعادة ضبط الحقل
+          // تأخير بسيط للسماح لـ Cloudinary بتحديث الفهرس
+          setTimeout(loadVideos, 2000);
+        } else if (error) {
+          console.error("Upload Widget Error:", error);
         }
       }
     );
@@ -88,60 +108,79 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
         <button onClick={onClose} className="bg-white/5 p-2 rounded-lg text-gray-400">إغلاق</button>
       </div>
 
+      {/* إعدادات الأمان */}
       <div className="mb-6">
         <button 
           onClick={() => setShowPassSettings(!showPassSettings)}
           className="text-[10px] text-gray-500 font-bold border-b border-gray-800 pb-1"
         >
-          {showPassSettings ? 'إغلاق إعدادات الأمان' : 'تغيير رمز العبور'}
+          {showPassSettings ? 'إغلاق الأمان' : 'تغيير رمز العبور'}
         </button>
-        
         {showPassSettings && (
-          <div className="mt-4 p-4 bg-white/5 rounded-2xl border border-white/10 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2">
-            <label className="text-xs font-bold text-gray-400">رمز العبور الجديد:</label>
-            <div className="flex gap-2">
-              <input 
-                type="text"
-                value={newPassInput}
-                onChange={(e) => setNewPassInput(e.target.value)}
-                className="flex-grow bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm text-red-500 outline-none focus:border-red-600"
-              />
-              <button 
-                onClick={handleUpdatePassword}
-                className="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-black shadow-[0_0_15px_red]"
-              >
-                حفظ
-              </button>
-            </div>
+          <div className="mt-4 p-4 bg-white/5 rounded-2xl border border-white/10 flex flex-col gap-3">
+            <input 
+              type="text"
+              value={newPassInput}
+              onChange={(e) => setNewPassInput(e.target.value)}
+              className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm text-red-500 outline-none"
+            />
+            <button onClick={handleUpdatePassword} className="bg-red-600 text-white py-2 rounded-xl text-xs font-black">حفظ الرمز</button>
           </div>
         )}
       </div>
 
-      <div className="mb-10 bg-red-600/10 p-6 rounded-3xl border border-red-600/20">
-        <h2 className="text-lg font-bold mb-4">رفع فيديو جديد</h2>
-        <p className="text-xs text-gray-500 mb-6 italic">ارفع الفيديو أولاً ثم قم بتعديل الاسم والقسم من القائمة بالأسفل</p>
+      {/* واجهة الرفع الجديدة */}
+      <div className="mb-10 bg-red-600/10 p-6 rounded-3xl border border-red-600/20 shadow-[0_0_30px_rgba(220,38,38,0.1)]">
+        <h2 className="text-lg font-bold mb-4 text-white">رفع فيديو جديد</h2>
+        
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="flex flex-col gap-2">
+            <label className="text-[10px] text-gray-400 font-bold">عنوان الفيديو (يظهر للمشاهدين):</label>
+            <input 
+              type="text"
+              placeholder="مثال: ليلة مرعبة في الغابة"
+              value={uploadTitle}
+              onChange={(e) => setUploadTitle(e.target.value)}
+              className="bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-red-600 transition-all"
+            />
+          </div>
+          
+          <div className="flex flex-col gap-2">
+            <label className="text-[10px] text-gray-400 font-bold">تصنيف الفيديو:</label>
+            <select 
+              value={uploadCategory}
+              onChange={(e) => setUploadCategory(e.target.value)}
+              className="bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-red-500 outline-none"
+            >
+              {CATEGORIES.map(c => <option key={c} value={c} className="bg-black text-white">{c}</option>)}
+            </select>
+          </div>
+        </div>
+
         <button 
           onClick={openUploadWidget}
-          className="w-full py-4 bg-red-600 text-white font-black rounded-2xl shadow-[0_0_20px_red] active:scale-95 transition-all"
+          className="w-full py-5 bg-red-600 text-white font-black rounded-2xl shadow-[0_0_20px_red] active:scale-95 transition-all flex items-center justify-center gap-3"
         >
-          فتح أداة الرفع (Mobile Friendly)
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+          ابدأ الرفع الآن
         </button>
       </div>
 
+      {/* قائمة الفيديوهات */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">إدارة الفيديوهات ({videos.length})</h2>
-          <button onClick={loadVideos} className="text-[10px] text-blue-500">تحديث القائمة ↻</button>
+          <h2 className="text-lg font-bold">مكتبة الفيديوهات ({videos.length})</h2>
+          <button onClick={loadVideos} className="text-[10px] text-blue-500 border border-blue-500/30 px-2 py-1 rounded-lg">تحديث القائمة ↻</button>
         </div>
         
         {loading ? (
           <div className="py-20 flex flex-col items-center gap-4 text-center">
             <div className="w-8 h-8 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="animate-pulse text-red-500 text-xs font-black uppercase">جاري الاتصال بالسحابة عبر Proxy...</p>
+            <p className="animate-pulse text-red-500 text-[10px] font-black uppercase">جاري مزامنة السحابة...</p>
           </div>
         ) : (
           videos.map(v => (
-            <div key={v.id} className={`bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3 transition-opacity ${isProcessing === v.public_id ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+            <div key={v.id} className={`bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3 transition-all ${isProcessing === v.public_id ? 'opacity-50 pointer-events-none scale-95' : 'opacity-100'}`}>
               <div className="flex items-center gap-4">
                 <div className="w-20 aspect-video bg-black rounded-lg overflow-hidden shrink-0 border border-white/5">
                   <video src={v.video_url} className="w-full h-full object-cover" />
@@ -152,29 +191,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
                     defaultValue={v.title}
                     onBlur={(e) => handleUpdate(v, e.target.value, v.category)}
                   />
-                  <select 
-                    className="bg-black/40 text-[10px] text-red-500 outline-none rounded px-1"
-                    defaultValue={v.category}
-                    onChange={(e) => handleUpdate(v, v.title, e.target.value)}
-                  >
-                    {CATEGORIES.map(c => <option key={c} value={c} className="bg-black">{c}</option>)}
-                  </select>
+                  <div className="flex items-center justify-between mt-2">
+                    <select 
+                      className="bg-black/40 text-[9px] text-red-500 outline-none rounded-md px-2 py-1"
+                      defaultValue={v.category}
+                      onChange={(e) => handleUpdate(v, v.title, e.target.value)}
+                    >
+                      {CATEGORIES.map(c => <option key={c} value={c} className="bg-black text-white">{c}</option>)}
+                    </select>
+                    <span className="text-[8px] text-gray-500">{v.type === 'short' ? 'Short' : 'Long'}</span>
+                  </div>
                 </div>
               </div>
               <div className="flex gap-2 justify-end border-t border-white/5 pt-3">
                 <button 
                   onClick={() => handleDelete(v.public_id)}
-                  className="px-4 py-1.5 bg-red-900/20 text-red-500 text-xs font-bold rounded-lg border border-red-500/20 hover:bg-red-600 hover:text-white transition-all"
+                  className="px-4 py-1.5 bg-red-900/20 text-red-500 text-[10px] font-bold rounded-lg border border-red-500/20 hover:bg-red-600 hover:text-white transition-all"
                 >
-                  {isProcessing === v.public_id ? 'جاري...' : 'حذف نهائي'}
+                  {isProcessing === v.public_id ? 'جاري المسح...' : 'حذف نهائي'}
                 </button>
               </div>
             </div>
           ))
         )}
       </div>
-      
-      <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
     </div>
   );
 };
