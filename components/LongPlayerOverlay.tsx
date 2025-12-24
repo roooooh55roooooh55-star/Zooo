@@ -22,6 +22,7 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
   video, allLongVideos, onClose, onLike, onDislike, onSave, onSwitchVideo, isLiked, isDisliked, isSaved, onProgress 
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -69,13 +70,16 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
   const stats = useMemo(() => getDeterministicStats(video.video_url), [video.video_url]);
 
   return (
-    <div className={`fixed inset-0 bg-[#050505] z-[200] flex flex-col transition-all duration-500 overflow-hidden ${isFullScreen ? 'z-[400]' : ''}`}>
+    <div 
+      ref={containerRef}
+      className={`fixed inset-0 bg-[#050505] z-[200] flex flex-col transition-all duration-500 overflow-hidden ${isFullScreen ? 'z-[400]' : ''}`}
+    >
       
-      {/* 1. قسم الفيديو (المنتصف العلوي) */}
-      <div className={`relative flex flex-col transition-all duration-500 ${isFullScreen ? 'h-full w-full' : 'h-[40vh] mt-4'}`}>
+      {/* قسم الفيديو الرئيسي */}
+      <div className={`relative flex flex-col transition-all duration-500 ${isFullScreen ? 'h-full w-full bg-black' : 'h-[40vh] mt-4'}`}>
         
-        {/* أزرار التحكم العلوية (X مقابل التكبير) */}
-        <div className="absolute top-4 left-0 right-0 px-6 flex justify-between items-center z-[220]">
+        {/* أزرار التحكم العلوية (تظهر دائماً في الوضع العادي وفي زوايا مدروسة في الكامل) */}
+        <div className={`absolute top-4 left-0 right-0 px-6 flex justify-between items-center z-[220] transition-all ${isFullScreen ? 'top-8' : ''}`}>
           <button 
             onClick={(e) => { e.stopPropagation(); onClose(); }} 
             className="p-3 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 text-red-600 shadow-2xl active:scale-90 transition-all"
@@ -87,13 +91,19 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
             onClick={toggleFullScreen}
             className="p-3 bg-red-600/80 backdrop-blur-xl rounded-2xl border border-red-400 text-white shadow-2xl active:scale-90 transition-all"
           >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-              <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
-            </svg>
+            {isFullScreen ? (
+               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                 <path d="M9 9L4 4m0 0h4m-4 0v4m11 1l5 5m0 0h-4m4 0v-4" />
+               </svg>
+            ) : (
+               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                 <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+               </svg>
+            )}
           </button>
         </div>
 
-        {/* مشغل الفيديو مع خاصية الدوران 9x16 عند التكبير */}
+        {/* الحاوية الدورانية للفيديو (YouTube Mobile Style) */}
         <div 
           className="relative w-full h-full bg-black flex items-center justify-center cursor-pointer overflow-hidden"
           onClick={() => setIsPaused(!isPaused)}
@@ -102,13 +112,13 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
             ref={videoRef}
             src={video.video_url}
             style={isFullScreen ? {
-              width: '100dvh', // عرض الفيديو يصبح بطول الشاشة
-              height: '100dvw', // طول الفيديو يصبح بعرض الشاشة
+              width: '100dvh', // عرض الفيديو يصبح طول الشاشة عند التدوير
+              height: '100dvw', // طول الفيديو يصبح عرض الشاشة عند التدوير
               position: 'absolute',
               top: '50%',
               left: '50%',
-              transform: 'translate(-50%, -50%) rotate(90deg)', // دوران الفيديو 90 درجة لملء الشاشة 9x16
-              objectFit: 'cover',
+              transform: 'translate(-50%, -50%) rotate(90deg)', // تدوير إجباري للوضع الأفقي
+              objectFit: 'contain', // يحافظ على نسبة 16:9 دون قص
               backgroundColor: 'black'
             } : {
               width: '100%',
@@ -131,11 +141,10 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
         </div>
       </div>
 
-      {/* 2. قسم التحكم والمقترحات (يختفي في وضع ملء الشاشة) */}
+      {/* قسم التفاعل والمقترحات (يختفي تماماً عند التكبير لضمان تركيز 100% على الفيديو) */}
       {!isFullScreen && (
         <div className="flex-grow flex flex-col p-6 gap-6 overflow-hidden">
           
-          {/* الزراير والبيانات مباشرة تحت الفيديو */}
           <div className="flex flex-col gap-4">
             <h2 className="text-xl font-black text-right leading-tight text-white line-clamp-2">{video.title}</h2>
             <div className="flex items-center justify-between text-[11px] font-black opacity-70">
@@ -159,7 +168,7 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
             </div>
           </div>
 
-          {/* 3. شريط المقترحات المتحرك (من اليسار إلى اليمين) */}
+          {/* شريط المقترحات المتحرك (من اليسار إلى اليمين) */}
           <div className="mt-auto mb-8">
             <h3 className="text-[11px] font-black text-gray-500 mb-4 text-right pr-2 italic">رحلات الرعب القادمة...</h3>
             <div className="relative overflow-hidden w-full h-28 flex items-center">
@@ -182,7 +191,6 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
         </div>
       )}
 
-      {/* CSS الماركي من اليسار إلى اليمين */}
       <style>{`
         @keyframes marquee-lr {
           0% { transform: translateX(0); }
