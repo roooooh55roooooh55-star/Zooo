@@ -40,7 +40,7 @@ const PrivacyPage: React.FC<{ onOpenAdmin: () => void }> = ({ onOpenAdmin }) => 
           <div className="mt-10 flex flex-col items-center gap-2">
             <span 
               onClick={onOpenAdmin}
-              className="text-[10px] text-white/5 cursor-pointer hover:text-red-900/40 transition-colors p-4"
+              className="text-[10px] text-white/5 hover:text-white/20 cursor-pointer transition-colors p-6 rounded-full"
             >
               النسخة 3.5.0 - Al-Hadiqa Dev
             </span>

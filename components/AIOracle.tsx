@@ -49,17 +49,21 @@ const AIOracle: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const [messages, setMessages] = useState<Message[]>(() => {
-    const saved = localStorage.getItem('al-hadiqa-ai-history');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('al-hadiqa-ai-history');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) { return []; }
   });
   const [loading, setLoading] = useState(false);
   const [voiceLimit, setVoiceLimit] = useState(() => {
-    const saved = localStorage.getItem('al-hadiqa-voice-limit-v3');
-    const today = new Date().toDateString();
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed.date === today) return parsed.count;
-    }
+    try {
+      const saved = localStorage.getItem('al-hadiqa-voice-limit-v3');
+      const today = new Date().toDateString();
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.date === today) return parsed.count || 0;
+      }
+    } catch (e) {}
     return 0;
   });
 
@@ -100,7 +104,7 @@ const AIOracle: React.FC = () => {
       return;
     }
 
-    if (voiceLimit >= 5) {
+    if (voiceLimit >= 10) {
       alert("أرواح الحديقة متعبة.. عد لاحقاً.");
       return;
     }
@@ -109,7 +113,6 @@ const AIOracle: React.FC = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setIsVoiceActive(true);
       
-      // Fix: Use API_KEY directly as per guidelines
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       audioContextInRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       audioContextOutRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
@@ -121,9 +124,7 @@ const AIOracle: React.FC = () => {
           inputAudioTranscription: {},
           outputAudioTranscription: {},
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
-          systemInstruction: `أنت 'الحديقة المرعبة AI'. ردودك مرعبة، قصيرة، ومختلفة تماماً كل مرة. 
-          تحدث كما لو كنت تشاهد المستخدم الآن. المايك سيبقى مفتوحاً دائماً حتى يغلقه المستخدم.
-          استمع باستمرار ورد بهمسات مخيفة.`,
+          systemInstruction: 'أنت الحديقة المرعبة AI. ردودك قصيرة، غامضة، ومرعبة جداً بالعربية.',
         },
         callbacks: {
           onopen: () => {
@@ -135,7 +136,6 @@ const AIOracle: React.FC = () => {
               const int16 = new Int16Array(inputData.length);
               for (let i = 0; i < inputData.length; i++) int16[i] = inputData[i] * 32768;
               const pcmBlob = { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' };
-              // Fix: sessionPromise.then ensures data is sent only after connection
               sessionPromise.then(session => session.sendRealtimeInput({ media: pcmBlob }));
             };
             source.connect(scriptProcessor);
@@ -159,7 +159,6 @@ const AIOracle: React.FC = () => {
             const audioBase64 = msg.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
             if (audioBase64 && audioContextOutRef.current) {
               const ctx = audioContextOutRef.current;
-              // Fix: schedule the next audio chunk to start at the exact end time of the previous one
               nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
               const audioBuffer = await decodeAudioData(decode(audioBase64), ctx, 24000, 1);
               const source = ctx.createBufferSource();
@@ -171,15 +170,8 @@ const AIOracle: React.FC = () => {
               nextStartTimeRef.current += audioBuffer.duration;
             }
           },
-          // Fix: Added missing onerror and onclose callbacks as per guidelines
-          onerror: (e: any) => {
-            console.error('Live API Error:', e);
-            setIsVoiceActive(false);
-          },
-          onclose: (e: any) => {
-            console.log('Live API Connection Closed:', e);
-            setIsVoiceActive(false);
-          }
+          onerror: (e) => { console.error(e); setIsVoiceActive(false); },
+          onclose: () => { setIsVoiceActive(false); }
         }
       });
       liveSessionRef.current = await sessionPromise;
@@ -199,20 +191,17 @@ const AIOracle: React.FC = () => {
               <img src="https://i.top4top.io/p_3643ksmii1.jpg" className="w-11 h-11 rounded-full border-2 border-red-600 shadow-[0_0_15px_red] object-cover" />
               <div className="flex flex-col">
                 <h2 className="text-sm font-black text-red-600 italic">الحديقة المرعبة AI</h2>
-                <span className="text-[7px] text-gray-500 uppercase">{5 - voiceLimit} أرواح باقية</span>
               </div>
             </div>
             <button onClick={() => { setIsOpen(false); if(isVoiceActive) handleToggleVoice(); }} className="text-gray-500 p-2"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
           </div>
 
           <div ref={scrollRef} className="flex-grow overflow-y-auto space-y-6 mb-4 scrollbar-hide px-2">
-            {messages.length === 0 && <p className="text-center opacity-20 text-[10px] italic mt-20">تكلم.. أنا أسمع دقات قلبك..</p>}
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}>
                 <div className={`max-w-[85%] p-5 rounded-[2rem] text-[13px] font-black shadow-2xl ${msg.role === 'user' ? 'bg-white/5 text-gray-300' : 'bg-red-950/40 text-red-500'}`}>{msg.text}</div>
               </div>
             ))}
-            {loading && <div className="text-right animate-pulse text-red-600 text-[9px] uppercase font-black">جاري الهمس...</div>}
           </div>
 
           <div className="flex flex-col gap-4">
@@ -223,7 +212,7 @@ const AIOracle: React.FC = () => {
                 </svg>
               </button>
             </div>
-            <p className="text-center text-[8px] font-black text-red-600 uppercase tracking-widest">{isVoiceActive ? 'أنا أسمعك الآن.. لا تتوقف' : 'انقر للتحدث مع الموت'}</p>
+            <p className="text-center text-[8px] font-black text-red-600 uppercase tracking-widest">{isVoiceActive ? 'أنا أسمعك الآن...' : 'انقر للتحدث مع الأرواح'}</p>
           </div>
         </div>
       )}

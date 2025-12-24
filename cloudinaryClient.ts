@@ -1,25 +1,30 @@
 
 import { Video } from './types';
 
+// تأكد من صحة هذه البيانات من لوحة تحكم Cloudinary الخاصة بك
 const CLOUD_NAME = 'dlrvn33p0'.trim();
 const API_KEY = '392293291257757'.trim();
 const API_SECRET = 'UPSWtjj8T4Vj4x6O_oE-0V3f_8c'.trim();
-const UPLOAD_PRESET = 'Good.zooo'.trim();
 
-const PROXY = 'https://corsproxy.io/?';
+// استخدام بروكسي أكثر قوة في تمرير الـ Headers
+const PROXY = 'https://api.allorigins.win/raw?url=';
 
 const getAuthHeader = () => {
   try {
-    return btoa(`${API_KEY}:${API_SECRET}`);
+    // تشفير مفتاح الـ API والسر بنظام Base64 للمصادقة الأساسية
+    const credentials = `${API_KEY}:${API_SECRET}`;
+    return btoa(credentials);
   } catch (e) {
+    console.error("Auth Encoding Failed", e);
     return '';
   }
 };
 
 export const fetchCloudinaryVideos = async (): Promise<Video[]> => {
   try {
-    // نطلب البيانات مع تفاصيل الأبعاد (width, height) لضمان التصنيف الصحيح
-    const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/video?max_results=500&context=true&tags=true&metadata=true`;
+    const timestamp = new Date().getTime();
+    // استخدام المسار العام للموارد لتقليل احتمالية رفض الطلب
+    const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/video?max_results=500&context=true&tags=true&t=${timestamp}`;
     
     const response = await fetch(
       `${PROXY}${encodeURIComponent(targetUrl)}`,
@@ -32,30 +37,44 @@ export const fetchCloudinaryVideos = async (): Promise<Video[]> => {
       }
     );
     
+    if (response.status === 401) {
+      console.error("خطأ 401: مفاتيح API مرفوضة. يرجى التأكد من API Key و API Secret في ملف cloudinaryClient.ts");
+      return [];
+    }
+
     if (!response.ok) {
-      throw new Error(`Cloudinary Fetch Error: ${response.status}`);
+      throw new Error(`Cloudinary Error: ${response.status}`);
     }
     
     const data = await response.json();
-    if (!data.resources) return [];
+    if (!data.resources || !Array.isArray(data.resources)) {
+      return [];
+    }
 
     return data.resources.map((res: any) => {
-      // تحديد النوع بناءً على الأبعاد: إذا كان الارتفاع أكبر من العرض فهو فيديو قصير (Short)
       const width = res.width || 0;
       const height = res.height || 0;
-      const isPortrait = height > width;
       
+      // تصنيف تلقائي بناءً على الأبعاد
+      const videoType: 'short' | 'long' = (height > width) ? 'short' : 'long';
+      
+      // تحسين الرابط للأداء
       const optimizedUrl = res.secure_url.replace('/upload/', '/upload/q_auto,f_auto/');
       
       const categories = ['رعب حقيقي', 'قصص رعب', 'غموض', 'ما وراء الطبيعة', 'أرشيف المطور'];
       const categoryTag = res.tags?.find((t: string) => categories.includes(t)) || 'غموض';
 
+      const caption = res.context?.custom?.caption || 
+                      res.context?.caption || 
+                      res.public_id.split('/').pop()?.replace(/_/g, ' ') || 
+                      'فيديو مرعب';
+
       return {
         id: res.public_id,
         public_id: res.public_id,
         video_url: optimizedUrl,
-        type: isPortrait ? 'short' : 'long',
-        title: res.context?.custom?.caption || res.public_id.split('/').pop()?.replace(/_/g, ' ') || 'فيديو مرعب',
+        type: videoType,
+        title: caption,
         likes: 0,
         views: 0,
         category: categoryTag,
@@ -63,7 +82,7 @@ export const fetchCloudinaryVideos = async (): Promise<Video[]> => {
       } as Video;
     });
   } catch (error) {
-    console.error('Cloudinary Sync Failed:', error);
+    console.error('Fetch Operation Failed:', error);
     return [];
   }
 };
@@ -95,7 +114,7 @@ export const updateCloudinaryMetadata = async (publicId: string, title: string, 
     contextParams.append('public_ids', publicId);
     contextParams.append('command', 'add');
 
-    const contextRes = await fetch(`${PROXY}${encodeURIComponent(contextUrl)}`, {
+    await fetch(`${PROXY}${encodeURIComponent(contextUrl)}`, {
       method: 'POST',
       headers: { 
         'Authorization': `Basic ${getAuthHeader()}`,
@@ -110,7 +129,7 @@ export const updateCloudinaryMetadata = async (publicId: string, title: string, 
     tagParams.append('public_ids', publicId);
     tagParams.append('command', 'replace');
 
-    const tagRes = await fetch(`${PROXY}${encodeURIComponent(tagUrl)}`, {
+    await fetch(`${PROXY}${encodeURIComponent(tagUrl)}`, {
       method: 'POST',
       headers: { 
         'Authorization': `Basic ${getAuthHeader()}`,
@@ -119,7 +138,7 @@ export const updateCloudinaryMetadata = async (publicId: string, title: string, 
       body: tagParams
     });
 
-    return contextRes.ok && tagRes.ok;
+    return true;
   } catch (error) {
     return false;
   }

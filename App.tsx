@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Video, AppView, UserInteractions } from './types.ts';
 import { fetchCloudinaryVideos } from './cloudinaryClient.ts';
 import AppBar from './components/AppBar.tsx';
@@ -22,30 +21,46 @@ const App: React.FC = () => {
   const [selectedShort, setSelectedShort] = useState<{ video: Video, list: Video[] } | null>(null);
   const [selectedLong, setSelectedLong] = useState<{ video: Video, list: Video[] } | null>(null);
 
-  // إدارة رمز العبور والتحقق
   const [adminPassword, setAdminPassword] = useState(() => {
-    return localStorage.getItem('al-hadiqa-admin-pass') || '506070';
+    try {
+      return localStorage.getItem('al-hadiqa-admin-pass') || '506070';
+    } catch (e) { return '506070'; }
   });
+
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authInput, setAuthInput] = useState('');
   const [authError, setAuthError] = useState(false);
 
   const [interactions, setInteractions] = useState<UserInteractions>(() => {
-    const saved = localStorage.getItem('al-hadiqa-interactions');
-    return saved ? JSON.parse(saved) : { likedIds: [], dislikedIds: [], savedIds: [], watchHistory: [] };
+    try {
+      const saved = localStorage.getItem('al-hadiqa-interactions');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          likedIds: Array.isArray(parsed.likedIds) ? parsed.likedIds : [],
+          dislikedIds: Array.isArray(parsed.dislikedIds) ? parsed.dislikedIds : [],
+          savedIds: Array.isArray(parsed.savedIds) ? parsed.savedIds : [],
+          watchHistory: Array.isArray(parsed.watchHistory) ? parsed.watchHistory : []
+        };
+      }
+    } catch (e) { console.error("Error loading interactions", e); }
+    return { likedIds: [], dislikedIds: [], savedIds: [], watchHistory: [] };
   });
 
   useEffect(() => {
-    localStorage.setItem('al-hadiqa-interactions', JSON.stringify(interactions));
+    try {
+      localStorage.setItem('al-hadiqa-interactions', JSON.stringify(interactions));
+    } catch (e) {}
   }, [interactions]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchCloudinaryVideos();
-      setRawVideos(data);
+      setRawVideos(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Sync Error:", err);
+      setRawVideos([]);
     } finally {
       setLoading(false);
     }
@@ -93,17 +108,43 @@ const App: React.FC = () => {
   };
 
   const homeVideos = useMemo(() => {
-    if (rawVideos.length === 0) return [];
-    return rawVideos.filter(v => !interactions.dislikedIds.includes(v.id));
+    return rawVideos.filter(v => !interactions.dislikedIds.includes(v.id || v.video_url));
   }, [rawVideos, interactions.dislikedIds]);
 
   const renderContent = () => {
+    // الأولوية لعرض الصفحات التي لا تعتمد على وجود فيديوهات
+    if (currentView === AppView.ADMIN) {
+      return <AdminDashboard onClose={() => setCurrentView(AppView.HOME)} currentPassword={adminPassword} onUpdatePassword={updateAdminPassword} />;
+    }
+    
+    if (currentView === AppView.PRIVACY) {
+      return <PrivacyPage onOpenAdmin={() => setIsAuthModalOpen(true)} />;
+    }
+
+    // ثم التحقق من حالة التحميل للصفحات الأخرى
     if (loading && rawVideos.length === 0) return (
-      <div className="flex flex-col items-center justify-center p-20 min-h-[50vh]">
+      <div className="flex flex-col items-center justify-center p-20 min-h-[60vh]">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin shadow-[0_0_25px_red]"></div>
-        <p className="text-red-500 font-black mt-8 text-xs animate-pulse tracking-[0.3em]">CLOUD SYNC...</p>
+        <p className="text-red-500 font-black mt-8 text-[10px] animate-pulse tracking-[0.3em] uppercase">يتم استحضار الأرواح...</p>
       </div>
     );
+
+    // حالة عدم وجود بيانات (تظهر فقط في الأقسام التي تتطلب فيديوهات)
+    // Fix: Removed redundant currentView !== AppView.PRIVACY and currentView !== AppView.ADMIN checks as they are already handled by early returns above.
+    if (rawVideos.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center p-20 text-center gap-6 min-h-[50vh]">
+          <div className="w-16 h-16 border-2 border-dashed border-red-600/30 rounded-full flex items-center justify-center opacity-50">
+             <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          </div>
+          <p className="text-gray-500 font-bold text-sm">الحديقة فارغة حالياً.. الأرواح في راحة.</p>
+          <div className="flex gap-4">
+            <button onClick={loadData} className="text-red-600 font-black text-xs border border-red-600/30 px-6 py-3 rounded-2xl bg-red-600/5 active:scale-95 transition-all">تحديث ↻</button>
+            <button onClick={() => setCurrentView(AppView.PRIVACY)} className="text-gray-500 font-black text-xs border border-white/10 px-6 py-3 rounded-2xl bg-white/5 active:scale-95 transition-all">الخصوصية</button>
+          </div>
+        </div>
+      );
+    }
 
     switch (currentView) {
       case AppView.TREND:
@@ -114,12 +155,8 @@ const App: React.FC = () => {
         return <SavedPage savedIds={interactions.likedIds} allVideos={rawVideos} onPlayShort={(v, l) => setSelectedShort({video:v, list:l})} onPlayLong={(v) => setSelectedLong({video:v, list:rawVideos})} title="الإعجابات" />;
       case AppView.UNWATCHED:
         return <UnwatchedPage watchHistory={interactions.watchHistory} allVideos={rawVideos} onPlayShort={(v, l) => setSelectedShort({video:v, list:l})} onPlayLong={(v) => setSelectedLong({video:v, list:rawVideos})} />;
-      case AppView.PRIVACY:
-        return <PrivacyPage onOpenAdmin={() => setIsAuthModalOpen(true)} />;
       case AppView.HIDDEN:
         return <HiddenVideosPage interactions={interactions} allVideos={rawVideos} onRestore={(id) => setInteractions(p=>({...p, dislikedIds: p.dislikedIds.filter(d=>d!==id)}))} onPlayShort={(v, l) => setSelectedShort({video:v, list:l})} onPlayLong={(v) => setSelectedLong({video:v, list:rawVideos})} />;
-      case AppView.ADMIN:
-        return <AdminDashboard onClose={() => setCurrentView(AppView.HOME)} currentPassword={adminPassword} onUpdatePassword={updateAdminPassword} />;
       default:
         return (
           <MainContent 
@@ -144,7 +181,6 @@ const App: React.FC = () => {
       <main className="pt-24 px-4">{renderContent()}</main>
       <AIOracle />
       
-      {/* نافذة التحقق المخصصة */}
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-[600] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
           <div className={`w-full bg-[#0a0a0a] border-2 rounded-[2.5rem] p-8 transition-all duration-300 ${authError ? 'border-red-600 shadow-[0_0_50px_red]' : 'border-white/10 shadow-2xl'}`}>
@@ -161,22 +197,10 @@ const App: React.FC = () => {
                 className={`w-full bg-white/5 border-2 rounded-2xl py-4 px-6 text-center text-xl font-bold outline-none transition-all ${authError ? 'border-red-600 text-red-500 animate-shake' : 'border-white/10 text-white focus:border-red-600'}`}
               />
               <div className="flex gap-4">
-                <button 
-                  type="submit"
-                  className="flex-1 bg-red-600 text-white font-black py-4 rounded-2xl shadow-[0_0_20px_red] active:scale-95 transition-all"
-                >
-                  فتح البوابة
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => { setIsAuthModalOpen(false); setAuthInput(''); setAuthError(false); }}
-                  className="px-6 bg-white/5 text-gray-400 font-bold py-4 rounded-2xl border border-white/10 active:scale-95 transition-all"
-                >
-                  تراجع
-                </button>
+                <button type="submit" className="flex-1 bg-red-600 text-white font-black py-4 rounded-2xl shadow-[0_0_20px_red] active:scale-95 transition-all">فتح البوابة</button>
+                <button type="button" onClick={() => { setIsAuthModalOpen(false); setAuthInput(''); setAuthError(false); }} className="px-6 bg-white/5 text-gray-400 font-bold py-4 rounded-2xl border border-white/10 active:scale-95 transition-all">تراجع</button>
               </div>
             </form>
-            {authError && <p className="text-red-500 text-xs font-black mt-6 text-center animate-pulse">الرمز خاطئ.. الأرواح غاضبة!</p>}
           </div>
         </div>
       )}
@@ -199,14 +223,14 @@ const App: React.FC = () => {
           video={selectedLong.video} 
           allLongVideos={selectedLong.list}
           onClose={() => setSelectedLong(null)}
-          onLike={() => setInteractions(p => ({...p, likedIds: Array.from(new Set([...p.likedIds, selectedLong.video.id]))}))}
-          onDislike={() => setInteractions(p => ({...p, dislikedIds: Array.from(new Set([...p.dislikedIds, selectedLong.video.id]))}))}
-          onSave={() => setInteractions(p => ({...p, savedIds: Array.from(new Set([...p.savedIds, selectedLong.video.id]))}))}
+          onLike={() => setInteractions(p => ({...p, likedIds: Array.from(new Set([...p.likedIds, selectedLong.video.id || selectedLong.video.video_url]))}))}
+          onDislike={() => setInteractions(p => ({...p, dislikedIds: Array.from(new Set([...p.dislikedIds, selectedLong.video.id || selectedLong.video.video_url]))}))}
+          onSave={() => setInteractions(p => ({...p, savedIds: Array.from(new Set([...p.savedIds, selectedLong.video.id || selectedLong.video.video_url]))}))}
           onSwitchVideo={(v) => setSelectedLong({ video: v, list: selectedLong.list })}
-          isLiked={interactions.likedIds.includes(selectedLong.video.id)} 
-          isDisliked={interactions.dislikedIds.includes(selectedLong.video.id)} 
-          isSaved={interactions.savedIds.includes(selectedLong.video.id)}
-          onProgress={(p) => updateWatchHistory(selectedLong.video.id, p)}
+          isLiked={interactions.likedIds.includes(selectedLong.video.id || selectedLong.video.video_url)} 
+          isDisliked={interactions.dislikedIds.includes(selectedLong.video.id || selectedLong.video.video_url)} 
+          isSaved={interactions.savedIds.includes(selectedLong.video.id || selectedLong.video.video_url)}
+          onProgress={(p) => updateWatchHistory(selectedLong.video.id || selectedLong.video.video_url, p)}
         />
       )}
 
