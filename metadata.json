@@ -1,5 +1,7 @@
 {
   "name": "الحديقة المرعبة ",
   "description": "تطبيق فيديو متقدم يدعم الفيديوهات القصيرة والطويلة مع نظام توصية ذكي وتكامل مع Supabase.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "microphone"
+  ]
 }

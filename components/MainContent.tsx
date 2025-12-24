@@ -43,6 +43,7 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
       ([entry]) => {
         setIsVisible(entry.isIntersecting);
         if (entry.isIntersecting) {
+          // الحفاظ على الانترنت: لا يتم تشغيل الفيديو فوراً بل بعد 600ms من التوقف أمامه
           timerRef.current = window.setTimeout(() => {
             setShouldPlay(true);
           }, 600);
@@ -83,6 +84,7 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
 
   return (
     <div onClick={onClick} className={`relative overflow-hidden cursor-pointer group bg-neutral-900 border border-white/5 transition-all active:scale-95 duration-500 animate-in fade-in zoom-in-95 ${className}`}>
+      {/* عرض الصورة المصغرة (أول إطار) لتوفير البيانات والسرعة */}
       <video 
         ref={videoRef} 
         src={video.video_url} 
@@ -131,9 +133,16 @@ const DraggableMarquee: React.FC<DraggableMarqueeProps> = ({ videos, onPlay, pro
         {marqueeList.map((video, i) => {
           const prog = progressMap?.get(video.id || video.video_url) || 0;
           return (
-            <div key={`${video.id || video.video_url}-${i}`} onClick={() => onPlay(video)} className="flex-shrink-0 w-56 group">
+            <div key={`${video.id || video.video_url}-${i}`} onClick={() => onPlay(video)} className="flex-shrink-0 w-56 group cursor-pointer">
               <div className="relative rounded-[2rem] overflow-hidden aspect-video bg-neutral-900 border border-white/10 shadow-xl transition-all group-active:scale-95 group-hover:border-red-500/30">
-                <video src={video.video_url} muted loop playsInline autoPlay preload="metadata" className="w-full h-full object-cover opacity-70" />
+                {/* استخدام الفيديو كصورة مصغرة صامتة وغير متحركة لتوفير البيانات ومنع تقطيع الفيديو الرئيسي */}
+                <video 
+                  src={video.video_url} 
+                  muted 
+                  playsInline 
+                  preload="metadata" 
+                  className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" 
+                />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                 {prog > 0 && (
                   <div className="absolute bottom-0 left-0 w-full h-1 bg-white/10">
@@ -231,9 +240,7 @@ const MainContent: React.FC<MainContentProps> = ({
   return (
     <div className="flex flex-col gap-14 pb-4">
       <section>
-        {/* الهيدر العلوي - العنوان على اليمين والجوهرة على اليسار */}
         <div className="flex items-center justify-between mb-6 px-1">
-          {/* اليمين: اللوجو والعنوان */}
           <div onClick={onResetHistory} className="flex items-center gap-3 cursor-pointer group active:scale-95 transition-all">
             <img src="https://i.top4top.io/p_3643ksmii1.jpg" className="w-10 h-10 rounded-full border-2 border-red-600 shadow-[0_0_15px_red] object-cover group-hover:shadow-[0_0_25px_red] transition-shadow" />
             <div className="flex flex-col">
@@ -242,31 +249,27 @@ const MainContent: React.FC<MainContentProps> = ({
             </div>
           </div>
           
-          {/* اليسار: جوهرة التخزين الذكية */}
           <div className="flex items-center justify-center pr-2">
             <button 
               onClick={onTurboCache}
-              className="relative group transition-transform active:scale-75"
-              aria-label="Smart Cache"
+              className="relative group transition-all active:scale-75"
+              aria-label="Turbo Cache Orb"
             >
-               {/* الحلقات الخارجية المتوهجة */}
-               <div className={`absolute -inset-2 rounded-full blur-xl transition-all duration-1000 opacity-60 ${
-                 cacheStatus === 'done' ? 'bg-green-500 shadow-[0_0_30px_#22c55e]' :
-                 cacheStatus === 'caching' ? 'bg-yellow-400 animate-pulse shadow-[0_0_40px_#facc15]' :
-                 'bg-red-600 shadow-[0_0_20px_#dc2626]'
+               <div className={`absolute -inset-3 rounded-full blur-xl transition-all duration-1000 opacity-70 ${
+                 cacheStatus === 'done' ? 'bg-green-500 shadow-[0_0_40px_#22c55e]' :
+                 cacheStatus === 'caching' ? 'bg-amber-400 animate-pulse shadow-[0_0_50px_#facc15]' :
+                 'bg-red-600 shadow-[0_0_25px_#dc2626]'
                }`}></div>
 
-               {/* جسم الجوهرة الرئيسي */}
-               <div className={`relative w-8 h-8 rounded-full border-2 transition-all duration-700 flex items-center justify-center shadow-inner ${
+               <div className={`relative w-9 h-9 rounded-full border-2 transition-all duration-700 flex items-center justify-center shadow-inner ${
                  cacheStatus === 'done' ? 'bg-green-600 border-green-300' :
-                 cacheStatus === 'caching' ? 'bg-yellow-500 border-yellow-200 animate-bounce' :
+                 cacheStatus === 'caching' ? 'bg-amber-500 border-amber-200 animate-bounce' :
                  'bg-red-700 border-red-400'
                }`}>
-                  {/* مركز الجوهرة - تفاعل ضوئي داخلي */}
-                  <div className={`w-3 h-3 rounded-full blur-[1px] ${
-                    cacheStatus === 'done' ? 'bg-green-200' :
+                  <div className={`w-3.5 h-3.5 rounded-full blur-[0.5px] ${
+                    cacheStatus === 'done' ? 'bg-green-100' :
                     cacheStatus === 'caching' ? 'bg-white' :
-                    'bg-red-300'
+                    'bg-red-200'
                   }`}></div>
                </div>
             </button>

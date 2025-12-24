@@ -78,10 +78,10 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
       {/* قسم الفيديو الرئيسي */}
       <div className={`relative flex flex-col transition-all duration-500 ${isFullScreen ? 'h-full w-full bg-black' : 'h-[40vh] mt-4'}`}>
         
-        {/* أزرار التحكم العلوية */}
+        {/* أزرار التحكم العلوية - موضعها يتغير في وضع ملء الشاشة لتناسب العرض الأفقي */}
         <div className={`absolute px-6 flex justify-between items-center z-[220] transition-all duration-500 ${
           isFullScreen 
-          ? 'top-0 bottom-0 right-4 flex-col py-10' 
+          ? 'top-0 bottom-0 right-6 flex-col py-6' 
           : 'top-4 left-0 right-0'
         }`}>
           <button 
@@ -116,13 +116,13 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
             ref={videoRef}
             src={video.video_url}
             style={isFullScreen ? {
-              width: '100dvh', // العرض يتناسب مع طول الشاشة
+              width: '100dvh', // عرض الفيديو يتناسب مع طول الشاشة
               height: '100dvw', // الطول يتناسب مع عرض الشاشة
               position: 'absolute',
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%) rotate(90deg)', // تدوير 90 درجة للوضع الأفقي
-              objectFit: 'cover', // ملء الشاشة بالكامل (Edge-to-Edge)
+              objectFit: 'cover', // ملء الشاشة بالكامل ويصل إلى الأطراف (Edge-to-Edge)
               backgroundColor: 'black'
             } : {
               width: '100%',
@@ -148,6 +148,7 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
       {/* قسم التفاعل والمقترحات */}
       {!isFullScreen && (
         <div className="flex-grow flex flex-col p-6 gap-6 overflow-hidden">
+          
           <div className="flex flex-col gap-4">
             <h2 className="text-xl font-black text-right leading-tight text-white line-clamp-2">{video.title}</h2>
             <div className="flex items-center justify-between text-[11px] font-black opacity-70">
@@ -171,6 +172,7 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
             </div>
           </div>
 
+          {/* شريط المقترحات المخصص: فيديوهات صامتة وثابتة لضمان تشغيل الفيديو الرئيسي بدون تقطيع */}
           <div className="mt-auto mb-8">
             <h3 className="text-[11px] font-black text-gray-500 mb-4 text-right pr-2 italic">رحلات الرعب القادمة...</h3>
             <div className="relative overflow-hidden w-full h-28 flex items-center">
@@ -179,9 +181,16 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
                   <div 
                     key={`${s.id || s.video_url}-${i}`}
                     onClick={() => onSwitchVideo(s)}
-                    className="flex-shrink-0 w-44 aspect-video rounded-2xl overflow-hidden border border-white/10 relative shadow-2xl active:scale-95 transition-all group/item cursor-pointer"
+                    className="flex-shrink-0 w-44 aspect-video rounded-2xl overflow-hidden border border-white/10 relative shadow-2xl active:scale-95 transition-all group/item cursor-pointer bg-neutral-900"
                   >
-                    <video src={s.video_url} muted loop playsInline autoPlay className="w-full h-full object-cover opacity-60 group-hover/item:opacity-100 transition-opacity" />
+                    {/* استخدام الفيديو كصورة مصغرة (لا يعمل تلقائياً لتوفير البيانات والسرعة) */}
+                    <video 
+                      src={s.video_url} 
+                      muted 
+                      playsInline 
+                      preload="metadata" 
+                      className="w-full h-full object-cover opacity-60 group-hover/item:opacity-100 transition-opacity" 
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent"></div>
                     <p className="absolute bottom-2 right-2 left-2 text-[9px] font-bold text-white text-right line-clamp-1">{s.title}</p>
                   </div>
@@ -189,6 +198,7 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
               </div>
             </div>
           </div>
+
         </div>
       )}
 
