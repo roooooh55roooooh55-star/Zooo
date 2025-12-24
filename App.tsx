@@ -44,6 +44,7 @@ const App: React.FC = () => {
   const [pullDistance, setPullDistance] = useState(0);
   const [cacheStatus, setCacheStatus] = useState<'idle' | 'caching' | 'done'>('idle');
   const touchStart = useRef<number>(0);
+  const isPulling = useRef<boolean>(false);
 
   const [interactions, setInteractions] = useState<UserInteractions>(() => {
     const saved = localStorage.getItem('al-hadiqa-interactions');
@@ -67,6 +68,7 @@ const App: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
       setPullDistance(0);
+      isPulling.current = false;
     }
   }, []);
 
@@ -119,12 +121,9 @@ const App: React.FC = () => {
     const watchedIds = new Set(interactions.watchHistory.filter(h => h.progress > 0.8).map(h => h.id));
     const savedIdsSet = new Set(interactions.savedIds);
     
-    // تصفية الفيديوهات: استبعاد المخفية واستبعاد المحفوظة (خاصة الشورتس)
     let pool = rawVideos.filter(v => {
       const id = v.id || v.video_url;
-      // استبعاد الفيديوهات المستبعدة يدوياً
       if (interactions.dislikedIds.includes(id)) return false;
-      // استبعاد الفيديوهات المحفوظة لضمان عدم تكرارها في الصفحة الرئيسية
       if (savedIdsSet.has(id)) return false;
       return true;
     });
@@ -149,9 +148,19 @@ const App: React.FC = () => {
     const isLiked = interactions.likedIds.includes(id);
     setInteractions(prev => ({
       ...prev,
-      likedIds: isLiked ? prev.likedIds.filter(v => v !== id) : [...prev.likedIds, id]
+      likedIds: isLiked ? prev.likedIds.filter(v => v !== id) : [...prev.likedIds, id],
+      dislikedIds: prev.dislikedIds.filter(v => v !== id) // إزالة من الديسك لايك إذا تم اللايك
     }));
     try { await updateLikesInDB(id, !isLiked); } catch (e) {}
+  };
+
+  const handleToggleDislike = (id: string) => {
+    const isDisliked = interactions.dislikedIds.includes(id);
+    setInteractions(prev => ({
+      ...prev,
+      dislikedIds: isDisliked ? prev.dislikedIds.filter(v => v !== id) : [...prev.dislikedIds, id],
+      likedIds: prev.likedIds.filter(v => v !== id) // إزالة من اللايك إذا تم الديسك لايك
+    }));
   };
 
   const handleToggleSave = (id: string) => {
@@ -197,37 +206,39 @@ const App: React.FC = () => {
     <div 
       className="min-h-screen pb-4 max-w-md mx-auto relative bg-[#050505] touch-pan-y"
       onTouchStart={(e) => { 
-        if (window.scrollY <= 1) touchStart.current = e.touches[0].clientY; 
+        if (window.scrollY <= 1) {
+          touchStart.current = e.touches[0].clientY;
+          isPulling.current = true;
+        } else {
+          isPulling.current = false;
+        }
       } }
       onTouchMove={(e) => {
-        if (window.scrollY <= 1 && touchStart.current > 0) {
+        if (isPulling.current && window.scrollY <= 1) {
           const diff = e.touches[0].clientY - touchStart.current;
-          if (diff > 10) { 
+          if (diff > 0) {
             setPullDistance(Math.min(diff / 2, 70));
           }
-        } else {
-          // إذا لم نكن في الأعلى، نقوم بتصفير touchStart للسماح بالتمرير الطبيعي
-          touchStart.current = 0;
         }
       }}
       onTouchEnd={() => {
         if (pullDistance > 55) {
           setRefreshing(true);
           handleRefreshFeed();
-          // تختفي علامة التحميل فوراً لبدء التحديث
+          // اختفاء فوري للعلامة
           setPullDistance(0);
-          setTimeout(() => setRefreshing(false), 800);
+          setTimeout(() => setRefreshing(false), 600);
         } else {
           setPullDistance(0);
         }
         touchStart.current = 0;
+        isPulling.current = false;
       }}
     >
       <AppBar onViewChange={setCurrentView} onRefresh={handleRefreshFeed} currentView={currentView} />
       
-      {/* علامة التحميل تظهر فقط أثناء السحب وتختفي فوراً عند الإفلات */}
       <div className="fixed left-0 right-0 z-[60] flex justify-center transition-all pointer-events-none" style={{ top: `${pullDistance + 10}px`, opacity: pullDistance / 55 }}>
-        <div className={`p-2 bg-red-600 rounded-full shadow-[0_0_25px_red] ${refreshing || pullDistance < 10 ? 'scale-0' : 'scale-100'}`}>
+        <div className={`p-2 bg-red-600 rounded-full shadow-[0_0_25px_red] ${refreshing || pullDistance < 10 ? 'opacity-0 scale-0' : 'opacity-100 scale-100'}`}>
           <svg className="w-5 h-5 text-white animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4"><path d="M19 9l-7 7-7-7" /></svg>
         </div>
       </div>
@@ -242,7 +253,7 @@ const App: React.FC = () => {
           interactions={interactions}
           onClose={() => setSelectedShort(null)} 
           onLike={handleToggleLike} 
-          onDislike={(id) => setInteractions(prev => ({ ...prev, dislikedIds: [...prev.dislikedIds, id] }))} 
+          onDislike={handleToggleDislike} 
           onSave={handleToggleSave} 
           onProgress={updateWatchHistory}
           onAllEnded={() => setSelectedShort(null)}
@@ -255,7 +266,7 @@ const App: React.FC = () => {
           allLongVideos={selectedLong.list}
           onClose={() => setSelectedLong(null)}
           onLike={() => handleToggleLike(selectedLong.video.id || selectedLong.video.video_url)}
-          onDislike={() => setInteractions(prev => ({ ...prev, dislikedIds: [...prev.dislikedIds, (selectedLong.video.id || selectedLong.video.video_url)] }))}
+          onDislike={() => handleToggleDislike(selectedLong.video.id || selectedLong.video.video_url)}
           onSave={() => handleToggleSave(selectedLong.video.id || selectedLong.video.video_url)}
           onSwitchVideo={(v) => {
             updateWatchHistory(v.id || v.video_url, 0.01);

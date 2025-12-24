@@ -104,15 +104,35 @@ const ScaryNeonLion = ({ colorClass }: { colorClass: string }) => (
 );
 
 const DraggableMarquee: React.FC<{ videos: Video[], interactions: UserInteractions, onPlay: (v: Video) => void, progressMap?: Map<string, number>, autoAnimate?: boolean, reverse?: boolean }> = ({ videos, interactions, onPlay, progressMap, autoAnimate, reverse }) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isPaused, setIsPaused] = useState(false);
+
+  // لضمان حركة دائرية بلا فجوات، نكرر الفيديوهات إذا كان العدد قليلاً أو لتغطية مساحة الحركة
+  const displayVideos = useMemo(() => {
+    if (!autoAnimate) return videos;
+    // نكرر المصفوفة لضمان وجود فيديوهات كافية لتغطية الحركة الدائرية
+    const repeated = [...videos, ...videos, ...videos];
+    return repeated;
+  }, [videos, autoAnimate]);
+
   return (
-    <div className={`relative overflow-hidden w-full ${autoAnimate ? 'marquee-container' : ''}`}>
-      <div className={`flex gap-4 pb-2 snap-x ${autoAnimate ? (reverse ? 'animate-marquee-reverse' : 'animate-marquee') : 'overflow-x-auto scrollbar-hide'}`}>
-        {(autoAnimate ? [...videos, ...videos] : videos).map((v, i) => {
+    <div 
+      className={`relative marquee-container w-full overflow-x-auto scroll-smooth scrollbar-hide`}
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onTouchStart={() => setIsPaused(true)}
+      onTouchEnd={() => setIsPaused(false)}
+    >
+      <div 
+        ref={scrollRef}
+        className={`flex gap-4 pb-4 px-2 ${autoAnimate && !isPaused ? (reverse ? 'animate-marquee-l-to-r' : 'animate-marquee-r-to-l') : 'overflow-x-visible'}`}
+      >
+        {displayVideos.map((v, i) => {
           const id = v.id || v.video_url;
           const progress = progressMap?.get(id) || 0;
           const { isNew } = checkStatus(v, interactions);
           return (
-            <div key={`${id}-${i}`} onClick={() => onPlay(v)} className="flex-shrink-0 w-36 snap-start active:scale-95 transition-all group relative">
+            <div key={`${id}-${i}`} onClick={() => onPlay(v)} className="flex-shrink-0 w-36 active:scale-95 transition-all group relative">
               <div className={`relative rounded-2xl overflow-hidden border border-white/10 bg-neutral-900 aspect-video shadow-[0_0_15px_rgba(255,255,255,0.05)]`}>
                 <video src={v.video_url} muted playsInline preload="metadata" className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
                 {isNew && <div className="absolute top-2 right-2 z-30 w-2 h-2 bg-red-600 rounded-full shadow-[0_0_8px_red] animate-pulse"></div>}
@@ -155,9 +175,34 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
     ]);
   }, [latestShorts, featuredLongs, moreShorts]);
 
-  const remainingVideos = useMemo(() => {
+  // قسم رعب جداً (سابقاً أرواح هائمة)
+  const veryScaryVideos = useMemo(() => {
     return videos.filter(v => !usedIds.has(v.id || v.video_url)).slice(0, 10);
   }, [videos, usedIds]);
+
+  // قسم كوابيس لا تنتهي
+  const endlessNightmares = useMemo(() => {
+    const veryScaryIds = new Set(veryScaryVideos.map(v => v.id || v.video_url));
+    return videos.filter(v => !usedIds.has(v.id || v.video_url) && !veryScaryIds.has(v.id || v.video_url)).slice(0, 12);
+  }, [videos, usedIds, veryScaryVideos]);
+
+  // قسم رعب حقيقي
+  const realHorrorVideos = useMemo(() => {
+    return videos.filter(v => v.category === 'رعب حقيقي' || v.title?.includes('رعب حقيقي')).slice(0, 15);
+  }, [videos]);
+
+  // قسم أرواح ضائعة
+  const lostSouls = useMemo(() => {
+    const veryScaryIds = new Set(veryScaryVideos.map(v => v.id || v.video_url));
+    const nightmareIds = new Set(endlessNightmares.map(v => v.id || v.video_url));
+    const realHorrorIds = new Set(realHorrorVideos.map(v => v.id || v.video_url));
+    return videos.filter(v => 
+      !usedIds.has(v.id || v.video_url) && 
+      !veryScaryIds.has(v.id || v.video_url) && 
+      !nightmareIds.has(v.id || v.video_url) &&
+      !realHorrorIds.has(v.id || v.video_url)
+    ).slice(0, 15);
+  }, [videos, usedIds, veryScaryVideos, endlessNightmares, realHorrorVideos]);
 
   const unwatchedHistoryMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -189,6 +234,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
 
   return (
     <div className="flex flex-col gap-10 pb-2">
+      {/* 1. الحديقة المرعبة */}
       <section>
         <div className="flex items-center justify-between mb-6 px-1">
           <div onClick={onResetHistory} className="flex items-center gap-3 cursor-pointer group active:scale-95 transition-all">
@@ -210,7 +256,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </div>
       </section>
 
-      {/* قسم كم المشاهدة - يمر من الشمال لليمين بحجم موحد وجذاب */}
+      {/* 2. واصل الارتعاش */}
       {continueWatchingVideos.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-4 px-1">
@@ -228,6 +274,22 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </section>
       )}
 
+      {/* 3. رعب جداً - (أرواح هائمة سابقاً) - دائري لا ينتهي */}
+      <section>
+        <div className="flex items-center gap-3 mb-4 px-1">
+          <div className="w-2.5 h-8 bg-purple-600 rounded-full shadow-[0_0_15px_#a855f7]"></div>
+          <h2 className="text-xl font-black text-white italic leading-none">رعب جداً</h2>
+        </div>
+        <DraggableMarquee 
+          videos={veryScaryVideos} 
+          interactions={interactions} 
+          onPlay={(v) => v.type === 'short' ? onPlayShort(v, allShorts) : onPlayLong(v, allLongs, true)} 
+          autoAnimate={true}
+          reverse={false}
+        />
+      </section>
+
+      {/* 4. سلاسل الموت */}
       <section>
         <div className="flex items-center gap-3 mb-6 px-1">
           <div className="w-2.5 h-8 bg-green-500 rounded-full shadow-[0_0_15px_rgba(34,197,94,0.6)]"></div>
@@ -240,6 +302,24 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </div>
       </section>
 
+      {/* 5. كوابيس لا تنتهي */}
+      {endlessNightmares.length > 0 && (
+        <section>
+          <div className="flex items-center gap-3 mb-4 px-1">
+            <div className="w-2.5 h-8 bg-red-800 rounded-full shadow-[0_0_15px_red]"></div>
+            <h2 className="text-xl font-black text-white italic leading-none">كوابيس لا تنتهي</h2>
+          </div>
+          <DraggableMarquee 
+            videos={endlessNightmares} 
+            interactions={interactions} 
+            onPlay={(v) => v.type === 'short' ? onPlayShort(v, allShorts) : onPlayLong(v, allLongs, true)} 
+            autoAnimate={true}
+            reverse={true}
+          />
+        </section>
+      )}
+
+      {/* 6. نبضات قصيرة */}
       {moreShorts.length > 0 && (
         <section>
           <div className="flex items-center gap-3 mb-6 px-1">
@@ -252,22 +332,41 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </section>
       )}
 
-      {remainingVideos.length > 0 && (
-        <section className="mt-4">
-          <div className="flex items-center justify-between mb-4 px-1">
-            <h2 className="text-sm font-black text-gray-500 italic tracking-widest uppercase">اكتشافات عشوائية</h2>
+      {/* 7. أرواح ضائعة */}
+      {lostSouls.length > 0 && (
+        <section>
+          <div className="flex items-center gap-3 mb-4 px-1">
+            <div className="w-2.5 h-8 bg-blue-600 rounded-full shadow-[0_0_15px_#3b82f6]"></div>
+            <h2 className="text-xl font-black text-white italic leading-none">أرواح ضائعة</h2>
           </div>
           <DraggableMarquee 
-            videos={remainingVideos} 
+            videos={lostSouls} 
             interactions={interactions} 
             onPlay={(v) => v.type === 'short' ? onPlayShort(v, allShorts) : onPlayLong(v, allLongs, true)} 
             autoAnimate={true}
+            reverse={false}
           />
         </section>
       )}
 
-      {/* مساحة فارغة للبنر الإعلاني للهواتف المحمولة - شفافة تماماً */}
-      <div className="h-[60px] w-full bg-transparent mb-6"></div>
+      {/* 8. رعب حقيقي */}
+      {realHorrorVideos.length > 0 && (
+        <section className="mt-2">
+          <div className="flex items-center gap-3 mb-4 px-1">
+            <div className="w-2.5 h-8 bg-orange-700 rounded-full shadow-[0_0_15px_#c2410c]"></div>
+            <h2 className="text-xl font-black text-white italic leading-none">رعب حقيقي</h2>
+          </div>
+          <DraggableMarquee 
+            videos={realHorrorVideos} 
+            interactions={interactions} 
+            onPlay={(v) => v.type === 'short' ? onPlayShort(v, allShorts) : onPlayLong(v, allLongs, true)} 
+            autoAnimate={true}
+            reverse={true} 
+          />
+        </section>
+      )}
+
+      <div className="h-[80px] w-full bg-transparent mb-12"></div>
     </div>
   );
 };
