@@ -34,7 +34,7 @@ const App: React.FC = () => {
   const [selectedShort, setSelectedShort] = useState<{ video: Video, list: Video[] } | null>(null);
   const [selectedLong, setSelectedLong] = useState<{ video: Video, list: Video[], autoNext: boolean } | null>(null);
   
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // مفتاح لإجبار المكونات على التحديث
   const [pullDistance, setPullDistance] = useState(0);
   const touchStart = useRef<number>(0);
 
@@ -87,15 +87,15 @@ const App: React.FC = () => {
     });
   };
 
-  // وظيفة تصفير سجل المشاهدة (Hard Reset)
+  // وظيفة تصفير السجل وإعادة التوزيع (Hard/Soft Reset)
   const resetWatchHistory = useCallback(() => {
     setInteractions(prev => ({
       ...prev,
       watchHistory: []
     }));
+    // تغيير التريجر يضمن إعادة حساب useMemo في MainContent واختيار فيديوهات عشوائية جديدة
     setRefreshTrigger(prev => prev + 1);
     loadData();
-    // تمرير اهتزاز بسيط للمستخدم ليشعر بالاستجابة إذا كان الجهاز يدعم ذلك
     if (navigator.vibrate) navigator.vibrate(50);
   }, [loadData]);
 
@@ -115,12 +115,13 @@ const App: React.FC = () => {
       return !interactions.dislikedIds.includes(vidId);
     });
     
+    // الترتيب الأساسي يعتمد على الأحدث، لكن MainContent سيقوم بالاختيار العشوائي
     return [...filtered].sort((a, b) => {
        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
        return dateB - dateA;
     });
-  }, [rawVideos, interactions.dislikedIds]);
+  }, [rawVideos, interactions.dislikedIds, refreshTrigger]);
 
   const handleToggleLike = async (id: string) => {
     const isLiked = interactions.likedIds.includes(id);
@@ -148,6 +149,7 @@ const App: React.FC = () => {
       default:
         return (
           <MainContent 
+            key={refreshTrigger} // استخدام المفتاح لإعادة بناء المكون بالكامل عند التحديث
             videos={homeVideos} 
             interactions={interactions}
             onPlayShort={handlePlayShort}
@@ -173,7 +175,7 @@ const App: React.FC = () => {
       onTouchEnd={() => {
         if (pullDistance > 60) {
           setRefreshing(true);
-          loadData();
+          resetWatchHistory(); // السحب للأسفل يقوم بتجديد الفيديوهات أيضاً
         } else setPullDistance(0);
         touchStart.current = 0;
       }}

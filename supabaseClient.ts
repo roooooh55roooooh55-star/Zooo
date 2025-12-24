@@ -25,12 +25,12 @@ export const fetchVideos = async (type?: 'short' | 'long', limit = 100) => {
   }
 };
 
-export const fetchTrendingVideos = async (limit = 20) => {
+export const fetchTrendingVideos = async (limit = 100) => {
   try {
     const { data, error } = await supabase
       .from('الحديقة')
       .select('*')
-      .order('views', { ascending: false }) // الترند يعتمد على المشاهدات
+      .order('views', { ascending: false }) 
       .limit(limit);
     
     if (error) {
@@ -54,7 +54,6 @@ export const updateLikesInDB = async (id: string, increment: boolean) => {
     if (!data) return;
 
     const newLikes = increment ? (data.likes + 1) : Math.max(0, data.likes - 1);
-    // عند الإعجاب، نزيد المشاهدات أيضاً كما طلب المستخدم
     const newViews = increment ? (data.views + 1) : data.views;
 
     await supabase

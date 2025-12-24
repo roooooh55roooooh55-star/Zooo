@@ -70,7 +70,7 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
   }, [isVisible, video.video_url]);
 
   return (
-    <div onClick={onClick} className={`relative overflow-hidden cursor-pointer group bg-neutral-900 border border-white/5 transition-all active:scale-95 duration-500 ${className}`}>
+    <div onClick={onClick} className={`relative overflow-hidden cursor-pointer group bg-neutral-900 border border-white/5 transition-all active:scale-95 duration-500 animate-in fade-in zoom-in-95 ${className}`}>
       <video 
         ref={videoRef} 
         src={video.video_url} 
@@ -107,7 +107,6 @@ interface DraggableMarqueeProps {
 
 const DraggableMarquee: React.FC<DraggableMarqueeProps> = ({ videos, onPlay, progressMap, autoAnimate }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
-  
   const marqueeList = useMemo(() => autoAnimate ? [...videos, ...videos] : videos, [videos, autoAnimate]);
 
   return (
@@ -151,11 +150,25 @@ interface MainContentProps {
 const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayShort, onPlayLong, onViewUnwatched, onResetHistory, loading }) => {
   const watchedIds = useMemo(() => new Set(interactions.watchHistory.map(h => h.id)), [interactions.watchHistory]);
 
-  const getSmartFilledList = (pool: Video[], count: number) => {
+  // منطق اختيار عشوائي لضمان تجديد المحتوى في كل مرة
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const newArr = [...array];
+    for (let i = newArr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+    }
+    return newArr;
+  };
+
+  const getSmartFilledListRandom = (pool: Video[], count: number) => {
     const unwatched = pool.filter(v => !watchedIds.has(v.id || v.video_url));
-    if (unwatched.length >= count) return unwatched.slice(0, count);
+    const shuffledUnwatched = shuffleArray(unwatched);
+    
+    if (shuffledUnwatched.length >= count) return shuffledUnwatched.slice(0, count);
+    
     const watched = pool.filter(v => watchedIds.has(v.id || v.video_url));
-    return [...unwatched, ...watched.slice(0, count - unwatched.length)];
+    const shuffledWatched = shuffleArray(watched);
+    return [...shuffledUnwatched, ...shuffledWatched.slice(0, count - shuffledUnwatched.length)];
   };
 
   const unwatchedHistoryMap = useMemo(() => {
@@ -178,18 +191,19 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
   const allShorts = useMemo(() => videos.filter(v => v.type === 'short'), [videos]);
   const allLongs = useMemo(() => videos.filter(v => v.type === 'long'), [videos]);
 
-  const latestShorts = useMemo(() => getSmartFilledList(allShorts, 4), [allShorts, watchedIds]);
-  const featuredLongs = useMemo(() => getSmartFilledList(allLongs, 4), [allLongs, watchedIds]);
+  // نستخدم التوزيع العشوائي في كل ريندر (أو عند تحديث الـ Pool)
+  const latestShorts = useMemo(() => getSmartFilledListRandom(allShorts, 4), [allShorts, watchedIds]);
+  const featuredLongs = useMemo(() => getSmartFilledListRandom(allLongs, 4), [allLongs, watchedIds]);
 
   const undiscoveredShorts = useMemo(() => {
     const latestIds = new Set(latestShorts.map(v => v.id || v.video_url));
     const pool = allShorts.filter(v => !latestIds.has(v.id || v.video_url));
-    return getSmartFilledList(pool, 4);
+    return getSmartFilledListRandom(pool, 4);
   }, [allShorts, latestShorts, watchedIds]);
 
   const remainingLongs = useMemo(() => {
     const featuredIds = new Set(featuredLongs.map(v => v.id || v.video_url));
-    return allLongs.filter(v => !featuredIds.has(v.id || v.video_url));
+    return shuffleArray(allLongs.filter(v => !featuredIds.has(v.id || v.video_url)));
   }, [allLongs, featuredLongs]);
 
   if (loading && videos.length === 0) {
@@ -212,7 +226,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
           <img src="https://i.top4top.io/p_3643ksmii1.jpg" className="w-10 h-10 rounded-full border-2 border-red-600 shadow-[0_0_15px_red] object-cover group-hover:shadow-[0_0_25px_red] transition-shadow" />
           <div className="flex flex-col">
             <h2 className="text-xl font-black text-red-600 italic leading-none group-hover:text-red-500">الحديقة المرعبة</h2>
-            <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Tap to Reset & Sync</span>
+            <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Tap to Refresh & Sync</span>
           </div>
           <div className="flex-grow h-[1px] bg-gradient-to-l from-red-600/40 to-transparent"></div>
         </div>
@@ -270,7 +284,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </div>
       </section>
 
-      {/* 5. سلاسل إضافية - ينتهي عند زر الـ AI */}
+      {/* 5. سلاسل إضافية */}
       {remainingLongs.length > 0 && (
         <section className="mb-4">
           <div className="flex items-center gap-3 mb-6 px-1">
