@@ -19,7 +19,6 @@ interface ShortsPlayerOverlayProps {
 const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({ 
   initialVideo, videoList, interactions, onClose, onLike, onDislike, onSave, onProgress, onAllEnded
 }) => {
-  const [activeList, setActiveList] = useState<Video[]>(videoList);
   const [currentIndex, setCurrentIndex] = useState(() => {
     const idx = videoList.findIndex(v => (v.id === initialVideo.id || v.video_url === initialVideo.video_url));
     return idx >= 0 ? idx : 0;
@@ -36,17 +35,8 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
     }
   }, []);
 
-  // إضافة فيديوهات عشوائية عند الاقتراب من النهاية (Endless Shuffle)
-  const appendRandomVideos = useCallback(() => {
-    const currentIds = new Set(activeList.map(v => v.id || v.video_url));
-    const pool = activeList.filter(v => !currentIds.has(v.id || v.video_url)); // if list were dynamic, we'd use external pool
-    // بما أن القائمة حالياً ثابتة، سنقوم بعمل Shuffle لها وإضافتها مجدداً
-    const shuffled = [...activeList].sort(() => Math.random() - 0.5);
-    setActiveList(prev => [...prev, ...shuffled.slice(0, 10)]);
-  }, [activeList]);
-
   useEffect(() => {
-    const currentVideo = activeList[currentIndex];
+    const currentVideo = videoList[currentIndex];
     if (currentVideo) {
       incrementViewsInDB(currentVideo.id || currentVideo.video_url);
       const vid = videoRefs.current[currentIndex];
@@ -58,22 +48,16 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
         });
       }
 
-      // Preload logic
-      [1, 2, 3].forEach(offset => {
+      // Preload next videos
+      [1, 2].forEach(offset => {
         const nextIdx = currentIndex + offset;
-        if (nextIdx < activeList.length) {
-          const v = activeList[nextIdx];
+        if (nextIdx < videoList.length) {
+          const v = videoList[nextIdx];
           const link = document.createElement('link');
-          link.rel = 'preload';
-          link.as = 'video';
-          link.href = v.video_url;
+          link.rel = 'preload'; link.as = 'video'; link.href = v.video_url;
           document.head.appendChild(link);
         }
       });
-    }
-
-    if (currentIndex >= activeList.length - 2) {
-      appendRandomVideos();
     }
     
     // Cleanup far-away videos
@@ -84,28 +68,31 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
         vid.pause();
         vid.src = ""; 
         vid.load();
-        vid.src = activeList[idx]?.video_url || ""; 
+        vid.src = videoList[idx]?.video_url || ""; 
       }
     });
-  }, [currentIndex, isMuted, activeList, appendRandomVideos]);
+  }, [currentIndex, isMuted, videoList]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const height = e.currentTarget.clientHeight;
     if (height === 0) return;
     const index = Math.round(e.currentTarget.scrollTop / height);
-    if (index !== currentIndex && index >= 0 && index < activeList.length) {
+    if (index !== currentIndex && index >= 0 && index < videoList.length) {
       setCurrentIndex(index);
     }
   };
 
   const handleVideoEnded = () => {
     if (isAutoPlay) {
-      const nextIndex = currentIndex + 1;
-      if (nextIndex < activeList.length) {
+      if (currentIndex < videoList.length - 1) {
+        const nextIndex = currentIndex + 1;
         setCurrentIndex(nextIndex);
         containerRef.current?.scrollTo({ top: nextIndex * containerRef.current.clientHeight, behavior: 'smooth' });
       } else {
-        appendRandomVideos();
+        // عند الوصول للنهاية، اختر فيديو عشوائياً من القائمة (Endless Loop)
+        const randomIdx = Math.floor(Math.random() * videoList.length);
+        setCurrentIndex(randomIdx);
+        containerRef.current?.scrollTo({ top: randomIdx * containerRef.current.clientHeight, behavior: 'smooth' });
       }
     }
   };
@@ -119,7 +106,7 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
       </div>
 
       <div ref={containerRef} onScroll={handleScroll} className="flex-grow overflow-y-scroll snap-y snap-mandatory scrollbar-hide h-full w-full">
-        {activeList.map((video, idx) => {
+        {videoList.map((video, idx) => {
           const videoId = video.id || video.video_url;
           const stats = getDeterministicStats(video.video_url);
           const isLiked = interactions.likedIds.includes(videoId);

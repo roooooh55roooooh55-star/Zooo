@@ -29,13 +29,18 @@ const TrendPage: React.FC<TrendPageProps> = ({ onPlayShort, onPlayLong, excluded
   }, []);
 
   const filteredTrends = useMemo(() => {
+    // استبعاد الفيديوهات المخفية
     const pool = rawTrends.filter(v => !excludedIds.includes(v.id || v.video_url));
+    
+    // فرز حسب المشاهدات
     const allShorts = pool.filter(v => v.type === 'short').sort((a, b) => (b.views || 0) - (a.views || 0));
     const allLongs = pool.filter(v => v.type === 'long').sort((a, b) => (b.views || 0) - (a.views || 0));
 
+    // اختيار 6 شورتس و 4 طويل
     const top6Shorts = allShorts.slice(0, 6);
     const top4Longs = allLongs.slice(0, 4);
 
+    // دمج وفرز نهائي
     return [...top6Shorts, ...top4Longs].sort((a, b) => (b.views || 0) - (a.views || 0));
   }, [rawTrends, excludedIds]);
 
@@ -46,7 +51,7 @@ const TrendPage: React.FC<TrendPageProps> = ({ onPlayShort, onPlayLong, excluded
       <div className="flex items-center justify-between border-b border-red-600/20 pb-4">
         <div className="flex flex-col">
            <h1 className="text-3xl font-black text-red-600 italic tracking-tighter">الرائج الآن</h1>
-           <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-1">Top 10 Viral Videos</p>
+           <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-1">Viral 10: 6 Shorts + 4 Originals</p>
         </div>
         <div className="flex gap-1.5 items-center">
            <span className="text-[10px] text-red-600 font-black animate-pulse">VIRAL DATA</span>

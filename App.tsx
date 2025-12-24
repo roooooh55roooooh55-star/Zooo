@@ -32,7 +32,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedShort, setSelectedShort] = useState<{ video: Video, list: Video[] } | null>(null);
-  const [selectedLong, setSelectedLong] = useState<{ video: Video, list: Video[], autoNext: boolean } | null>(null);
+  const [selectedLong, setSelectedLong] = useState<{ video: Video, list: Video[] } | null>(null);
   
   const [refreshTrigger, setRefreshTrigger] = useState(0); 
   const [pullDistance, setPullDistance] = useState(0);
@@ -99,22 +99,10 @@ const App: React.FC = () => {
     setSelectedShort({ video: v, list });
   };
 
-  const handlePlayLong = (v: Video, list: Video[], autoNext = false) => {
+  const handlePlayLong = (v: Video, list: Video[]) => {
     updateWatchHistory(v.id || v.video_url, 0.01);
-    setSelectedLong({ video: v, list, autoNext });
+    setSelectedLong({ video: v, list });
   };
-
-  const handleNextLong = useCallback(() => {
-    if (!selectedLong) return;
-    const { video, list } = selectedLong;
-    const currentIndex = list.findIndex(v => (v.id === video.id || v.video_url === video.video_url));
-    if (currentIndex > -1 && currentIndex < list.length - 1) {
-      const nextVideo = list[currentIndex + 1];
-      handlePlayLong(nextVideo, list, true);
-    } else {
-      setSelectedLong(null);
-    }
-  }, [selectedLong]);
 
   const homeVideos = useMemo(() => {
     const filtered = rawVideos.filter(v => {
@@ -128,6 +116,8 @@ const App: React.FC = () => {
     });
   }, [rawVideos, interactions.dislikedIds, refreshTrigger]);
 
+  const allLongsPool = useMemo(() => rawVideos.filter(v => v.type === 'long'), [rawVideos]);
+
   const handleToggleLike = async (id: string) => {
     const isLiked = interactions.likedIds.includes(id);
     setInteractions(prev => ({
@@ -140,15 +130,15 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (currentView) {
       case AppView.TREND:
-        return <TrendPage onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, rawVideos.filter(vid => vid.type === 'long'), true)} excludedIds={interactions.dislikedIds} />;
+        return <TrendPage onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, allLongsPool)} excludedIds={interactions.dislikedIds} />;
       case AppView.SAVED:
-        return <SavedPage savedIds={interactions.savedIds} allVideos={rawVideos} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, rawVideos.filter(vid => vid.type === 'long'), true)} title="المحفوظات" />;
+        return <SavedPage savedIds={interactions.savedIds} allVideos={rawVideos} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, allLongsPool)} title="المحفوظات" />;
       case AppView.LIKES:
-        return <SavedPage savedIds={interactions.likedIds} allVideos={rawVideos} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, rawVideos.filter(vid => vid.type === 'long'), true)} title="الإعجابات" />;
+        return <SavedPage savedIds={interactions.likedIds} allVideos={rawVideos} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, allLongsPool)} title="الإعجابات" />;
       case AppView.UNWATCHED:
-        return <UnwatchedPage watchHistory={interactions.watchHistory} allVideos={rawVideos} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, rawVideos.filter(vid => vid.type === 'long'), true)} />;
+        return <UnwatchedPage watchHistory={interactions.watchHistory} allVideos={rawVideos} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, allLongsPool)} />;
       case AppView.HIDDEN:
-        return <HiddenVideosPage interactions={interactions} allVideos={rawVideos} onRestore={(id) => setInteractions(p => ({ ...p, dislikedIds: p.dislikedIds.filter(v => v !== id) }))} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, rawVideos.filter(vid => vid.type === 'long'), false)} />;
+        return <HiddenVideosPage interactions={interactions} allVideos={rawVideos} onRestore={(id) => setInteractions(p => ({ ...p, dislikedIds: p.dislikedIds.filter(v => v !== id) }))} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, allLongsPool)} />;
       case AppView.PRIVACY:
         return <PrivacyPage />;
       default:
@@ -158,7 +148,7 @@ const App: React.FC = () => {
             videos={homeVideos} 
             interactions={interactions}
             onPlayShort={handlePlayShort}
-            onPlayLong={(v, list) => handlePlayLong(v, list, true)}
+            onPlayLong={(v, list) => handlePlayLong(v, list)}
             onViewUnwatched={() => setCurrentView(AppView.UNWATCHED)}
             onResetHistory={resetWatchHistory}
             loading={loading && rawVideos.length === 0}
@@ -213,6 +203,7 @@ const App: React.FC = () => {
       {selectedLong && (
         <LongPlayerOverlay 
           video={selectedLong.video} 
+          allLongVideos={selectedLong.list}
           onClose={() => setSelectedLong(null)}
           onLike={() => handleToggleLike(selectedLong.video.id || selectedLong.video.video_url)}
           onDislike={() => setInteractions(prev => ({ ...prev, dislikedIds: [...prev.dislikedIds, (selectedLong.video.id || selectedLong.video.video_url)] }))}
@@ -220,13 +211,14 @@ const App: React.FC = () => {
             const id = selectedLong.video.id || selectedLong.video.video_url;
             return { ...prev, savedIds: prev.savedIds.includes(id) ? prev.savedIds.filter(v => v !== id) : [...prev.savedIds, id] };
           })}
-          onNext={handleNextLong} 
-          onPrev={() => {}} 
+          onSwitchVideo={(v) => {
+            updateWatchHistory(v.id || v.video_url, 0.01);
+            setSelectedLong({ video: v, list: selectedLong.list });
+          }}
           isLiked={interactions.likedIds.includes(selectedLong.video.id || selectedLong.video.video_url)}
           isDisliked={interactions.dislikedIds.includes(selectedLong.video.id || selectedLong.video.video_url)}
           isSaved={interactions.savedIds.includes(selectedLong.video.id || selectedLong.video.video_url)}
           onProgress={(p) => updateWatchHistory(selectedLong.video.id || selectedLong.video.video_url, p)}
-          onEnded={handleNextLong}
         />
       )}
     </div>

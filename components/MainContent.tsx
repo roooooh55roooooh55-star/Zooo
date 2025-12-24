@@ -2,13 +2,14 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { Video, UserInteractions } from '../types.ts';
 
-// خوارزمية الأرقام الضخمة جداً (Viral Stats)
+// خوارزمية الأرقام الضخمة جداً (Viral Stats) لتعزيز جاذبية الفيديوهات
 export const getDeterministicStats = (url: string) => {
   let hash = 0;
   for (let i = 0; i < url.length; i++) hash = url.charCodeAt(i) + ((hash << 5) - hash);
-  // أرقام ضخمة: مشاهدات بين 10 مليون و 90 مليون، لايكات بين 900 ألف و 8 مليون
-  const viewsSeed = (Math.abs(hash % 80) + 10) * 1000000 + (Math.abs(hash % 900) * 1000);
-  const likesSeed = (Math.abs(hash % 7) + 1) * 1000000 + (Math.abs(hash % 800) * 1000);
+  // أرقام ضخمة: مشاهدات بين 10 مليون و 95 مليون
+  const viewsSeed = (Math.abs(hash % 85) + 10) * 1000000 + (Math.abs(hash % 900) * 1000);
+  // لايكات بين مليون و 8 مليون
+  const likesSeed = (Math.abs(hash % 8) + 1) * 1000000 + (Math.abs(hash % 800) * 1000);
   return { likes: likesSeed, views: viewsSeed };
 };
 
