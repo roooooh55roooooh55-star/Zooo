@@ -6,12 +6,12 @@ import { getDeterministicStats, formatBigNumber } from './MainContent.tsx';
 
 interface LongPlayerOverlayProps {
   video: Video;
-  allLongVideos: Video[]; // إضافة القائمة الكاملة للتعامل مع التشغيل التلقائي
+  allLongVideos: Video[];
   onClose: () => void;
   onLike: () => void;
   onDislike: () => void;
   onSave: () => void;
-  onSwitchVideo: (v: Video) => void; // وظيفة لتغيير الفيديو المشغل
+  onSwitchVideo: (v: Video) => void;
   isLiked: boolean;
   isDisliked: boolean;
   isSaved: boolean;
@@ -24,10 +24,8 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [isLandscape, setIsLandscape] = useState(false);
-  const [showControls, setShowControls] = useState(true);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   
-  // تصفية الفيديوهات المقترحة (باستثناء الفيديو الحالي)
   const suggestions = useMemo(() => {
     return allLongVideos.filter(v => (v.id || v.video_url) !== (video.id || video.video_url));
   }, [allLongVideos, video]);
@@ -46,7 +44,6 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
     const updateTime = () => { if (v.duration) onProgress(v.currentTime / v.duration); };
     
     const handleEnd = () => { 
-      // عند انتهاء الفيديو، تشغيل الفيديو التالي من المقترحات تلقائياً
       if (suggestions.length > 0) {
         onSwitchVideo(suggestions[0]);
       } else {
@@ -63,34 +60,56 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
     };
   }, [video, suggestions, onSwitchVideo]);
 
-  const toggleLandscape = (e: React.MouseEvent) => {
+  const toggleFullScreen = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsLandscape(!isLandscape);
+    setIsFullScreen(!isFullScreen);
     if (navigator.vibrate) navigator.vibrate(50);
   };
 
   const stats = useMemo(() => getDeterministicStats(video.video_url), [video.video_url]);
 
   return (
-    <div className={`fixed inset-0 bg-[#050505] z-[200] flex flex-col transition-all duration-500 overflow-hidden ${isLandscape ? 'z-[400]' : ''}`}>
+    <div className={`fixed inset-0 bg-[#050505] z-[200] flex flex-col transition-all duration-500 overflow-hidden ${isFullScreen ? 'z-[400]' : ''}`}>
       
-      {/* 1. قسم الفيديو العلوي */}
-      <div className={`relative flex flex-col transition-all duration-500 ${isLandscape ? 'h-full w-full' : 'h-[45vh] mt-4'}`}>
+      {/* 1. قسم الفيديو (المنتصف العلوي) */}
+      <div className={`relative flex flex-col transition-all duration-500 ${isFullScreen ? 'h-full w-full' : 'h-[40vh] mt-4'}`}>
+        
+        {/* أزرار التحكم العلوية (X مقابل التكبير) */}
+        <div className="absolute top-4 left-0 right-0 px-6 flex justify-between items-center z-[220]">
+          <button 
+            onClick={(e) => { e.stopPropagation(); onClose(); }} 
+            className="p-3 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 text-red-600 shadow-2xl active:scale-90 transition-all"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+
+          <button 
+            onClick={toggleFullScreen}
+            className="p-3 bg-red-600/80 backdrop-blur-xl rounded-2xl border border-red-400 text-white shadow-2xl active:scale-90 transition-all"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+              <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* مشغل الفيديو مع خاصية الدوران 9x16 عند التكبير */}
         <div 
-          className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center cursor-pointer"
+          className="relative w-full h-full bg-black flex items-center justify-center cursor-pointer overflow-hidden"
           onClick={() => setIsPaused(!isPaused)}
         >
           <video 
             ref={videoRef}
             src={video.video_url}
-            style={isLandscape ? {
-              width: '100dvh',
-              height: '100dvw',
+            style={isFullScreen ? {
+              width: '100dvh', // عرض الفيديو يصبح بطول الشاشة
+              height: '100dvw', // طول الفيديو يصبح بعرض الشاشة
               position: 'absolute',
               top: '50%',
               left: '50%',
-              transform: 'translate(-50%, -50%) rotate(90deg)',
-              objectFit: 'cover', // ملء الشاشة بالكامل 9x16 عند التدوير
+              transform: 'translate(-50%, -50%) rotate(90deg)', // دوران الفيديو 90 درجة لملء الشاشة 9x16
+              objectFit: 'cover',
+              backgroundColor: 'black'
             } : {
               width: '100%',
               height: '100%',
@@ -98,79 +117,61 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
             }}
             playsInline
             preload="auto"
+            muted={isMuted}
+            autoPlay
           />
 
-          {/* أزرار التحكم العلوية (X و Expand) */}
-          <div className="absolute top-4 left-0 right-0 px-6 flex justify-between items-center z-[210]">
-            <button 
-              onClick={(e) => { e.stopPropagation(); onClose(); }} 
-              className="p-3 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 text-red-600 shadow-2xl active:scale-90 transition-all"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-
-            <button 
-              onClick={toggleLandscape}
-              className="p-3 bg-red-600/80 backdrop-blur-xl rounded-2xl border border-red-400 text-white shadow-2xl active:scale-90 transition-all"
-            >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-                <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
-              </svg>
-            </button>
-          </div>
-
-          {/* مؤشر التحميل والوسط */}
-          {isPaused && (
-            <div className="absolute inset-0 flex items-center justify-center z-[205] bg-black/20">
-               <div className="w-20 h-20 rounded-full bg-red-600/40 backdrop-blur-md flex items-center justify-center border border-red-500">
-                  <svg className="w-10 h-10 text-white translate-x-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          {isPaused && !isFullScreen && (
+            <div className="absolute inset-0 flex items-center justify-center z-[215] bg-black/20">
+               <div className="w-16 h-16 rounded-full bg-red-600/50 backdrop-blur-md flex items-center justify-center border border-red-500 shadow-[0_0_20px_red]">
+                  <svg className="w-8 h-8 text-white translate-x-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* 2. قسم المحتوى السفلي (يختفي في وضع التدوير) */}
-      {!isLandscape && (
-        <div className="flex-grow flex flex-col p-6 gap-6 overflow-y-auto scrollbar-hide">
+      {/* 2. قسم التحكم والمقترحات (يختفي في وضع ملء الشاشة) */}
+      {!isFullScreen && (
+        <div className="flex-grow flex flex-col p-6 gap-6 overflow-hidden">
           
-          {/* تفاصيل الفيديو والأزرار */}
+          {/* الزراير والبيانات مباشرة تحت الفيديو */}
           <div className="flex flex-col gap-4">
-            <h2 className="text-xl font-black text-right leading-tight">{video.title}</h2>
-            <div className="flex items-center justify-between text-[11px] font-black text-gray-500">
+            <h2 className="text-xl font-black text-right leading-tight text-white line-clamp-2">{video.title}</h2>
+            <div className="flex items-center justify-between text-[11px] font-black opacity-70">
               <span className="text-blue-400">{formatBigNumber(stats.views)} مشاهدة حديقة</span>
               <span className="text-red-500">{formatBigNumber(stats.likes)} إعجاب رعب</span>
             </div>
 
             <div className="grid grid-cols-4 gap-3">
-              <button onClick={onLike} className={`py-4 rounded-2xl border transition-all flex justify-center ${isLiked ? 'bg-blue-600/20 border-blue-500 text-blue-400' : 'bg-white/5 border-white/10 text-white'}`}>
+              <button onClick={onLike} className={`py-4 rounded-2xl border transition-all flex justify-center items-center ${isLiked ? 'bg-blue-600/20 border-blue-500 text-blue-400 shadow-[0_0_15px_blue]' : 'bg-white/5 border-white/10 text-white'}`}>
                 <svg className="w-6 h-6" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
               </button>
-              <button onClick={onDislike} className={`py-4 rounded-2xl border transition-all flex justify-center ${isDisliked ? 'bg-red-600/20 border-red-500 text-red-400' : 'bg-white/5 border-white/10 text-white'}`}>
+              <button onClick={onDislike} className={`py-4 rounded-2xl border transition-all flex justify-center items-center ${isDisliked ? 'bg-red-600/20 border-red-500 text-red-400 shadow-[0_0_15px_red]' : 'bg-white/5 border-white/10 text-white'}`}>
                 <svg className="w-6 h-6 rotate-180" fill={isDisliked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
               </button>
-              <button onClick={onSave} className={`py-4 rounded-2xl border transition-all flex justify-center ${isSaved ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500' : 'bg-white/5 border-white/10 text-white'}`}>
+              <button onClick={onSave} className={`py-4 rounded-2xl border transition-all flex justify-center items-center ${isSaved ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500 shadow-[0_0_15px_yellow]' : 'bg-white/5 border-white/10 text-white'}`}>
                 <svg className="w-6 h-6" fill={isSaved ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
               </button>
-              <button onClick={() => setIsMuted(!isMuted)} className={`py-4 rounded-2xl border transition-all flex justify-center ${isMuted ? 'bg-red-600/20 border-red-500 text-red-500' : 'bg-white/5 border-white/10 text-white'}`}>
+              <button onClick={() => setIsMuted(!isMuted)} className={`py-4 rounded-2xl border transition-all flex justify-center items-center ${isMuted ? 'bg-red-600/20 border-red-500 text-red-500' : 'bg-white/5 border-white/10 text-white'}`}>
                 {isMuted ? <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M5.586 15L4 16.586V7.414L5.586 9H10l5-5v16l-5-5H5.586zM17 9l4 4m0-4l-4 4"/></svg> : <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15L4 16.586V7.414L5.586 9H10l5-5v16l-5-5H5.586z"/></svg>}
               </button>
             </div>
           </div>
 
-          {/* 3. شريط المقترحات المتحرك (Marquee من الشمال لليمين) */}
-          <div className="mt-auto pb-10">
-            <h3 className="text-sm font-black text-gray-400 mb-4 text-right pr-2 italic">تكملة الرحلة...</h3>
-            <div className="relative overflow-hidden group">
-              <div className="flex gap-4 animate-marquee-reverse hover:pause-animation">
+          {/* 3. شريط المقترحات المتحرك (من اليسار إلى اليمين) */}
+          <div className="mt-auto mb-8">
+            <h3 className="text-[11px] font-black text-gray-500 mb-4 text-right pr-2 italic">رحلات الرعب القادمة...</h3>
+            <div className="relative overflow-hidden w-full h-28 flex items-center">
+              <div className="flex gap-4 animate-marquee-lr hover:pause-animation">
                 {[...suggestions, ...suggestions].map((s, i) => (
                   <div 
                     key={`${s.id || s.video_url}-${i}`}
                     onClick={() => onSwitchVideo(s)}
-                    className="flex-shrink-0 w-44 aspect-video rounded-2xl overflow-hidden border border-white/10 relative group-hover:border-red-600/50 transition-all cursor-pointer shadow-xl active:scale-95"
+                    className="flex-shrink-0 w-44 aspect-video rounded-2xl overflow-hidden border border-white/10 relative shadow-2xl active:scale-95 transition-all group/item cursor-pointer"
                   >
-                    <video src={s.video_url} muted loop playsInline autoPlay className="w-full h-full object-cover opacity-60" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+                    <video src={s.video_url} muted loop playsInline autoPlay className="w-full h-full object-cover opacity-60 group-hover/item:opacity-100 transition-opacity" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent"></div>
                     <p className="absolute bottom-2 right-2 left-2 text-[9px] font-bold text-white text-right line-clamp-1">{s.title}</p>
                   </div>
                 ))}
@@ -181,16 +182,16 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
         </div>
       )}
 
-      {/* CSS مخصص للتحريك العكسي (من الشمال لليمين) */}
+      {/* CSS الماركي من اليسار إلى اليمين */}
       <style>{`
-        @keyframes marquee-reverse {
+        @keyframes marquee-lr {
           0% { transform: translateX(0); }
           100% { transform: translateX(50%); }
         }
-        .animate-marquee-reverse {
+        .animate-marquee-lr {
           display: flex;
           width: max-content;
-          animation: marquee-reverse 25s linear infinite;
+          animation: marquee-lr 25s linear infinite;
         }
         .hover\\:pause-animation:hover {
           animation-play-state: paused;
