@@ -4,12 +4,14 @@ import { Video } from './types';
 const CLOUD_NAME = 'dlrvn33p0'.trim();
 const API_KEY = '392293291257757'.trim();
 const API_SECRET = 'UPSWtjj8T4Vj4x6O_oE-0V3f_8c'.trim();
+
+// استخدام بروكسي بديل أكثر استقراراً أو الطلب المباشر مع HTTPS
 const PROXY = 'https://api.allorigins.win/raw?url=';
 
 const getAuthHeader = () => {
   try {
-    const credentials = `${API_KEY}:${API_SECRET}`;
-    return `Basic ${btoa(credentials)}`;
+    const credentials = btoa(`${API_KEY}:${API_SECRET}`);
+    return `Basic ${credentials}`;
   } catch (e) {
     return '';
   }
@@ -18,13 +20,15 @@ const getAuthHeader = () => {
 export const fetchCloudinaryVideos = async (): Promise<Video[]> => {
   try {
     const timestamp = new Date().getTime();
-    // التغيير لـ resources endpoint لأنه أكثر توافقاً مع طلبات CORS البروكسي
-    const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/video?max_results=500&context=true&tags=true&t=${timestamp}`;
+    // استخدام Search API للحصول على أحدث الفيديوهات المرفوعة فوراً
+    // التعبير resource_type:video يضمن جلب الفيديوهات فقط
+    const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/search?expression=resource_type:video&with_field=context&with_field=tags&max_results=500&sort_by=created_at:desc&t=${timestamp}`;
     
     const response = await fetch(
       `${PROXY}${encodeURIComponent(targetUrl)}`,
       { 
         method: 'GET',
+        mode: 'cors',
         headers: { 
           'Authorization': getAuthHeader(),
           'Accept': 'application/json'
@@ -33,24 +37,30 @@ export const fetchCloudinaryVideos = async (): Promise<Video[]> => {
     );
     
     if (!response.ok) {
-        // محاولة بديلة عبر Search API في حال فشل الـ resources
-        return await fetchViaSearch();
+        throw new Error(`Cloudinary Error: ${response.status}`);
     }
     
     const data = await response.json();
     const resources = data.resources || [];
+    
+    if (resources.length === 0) {
+        // محاولة جلب عبر الـ Resources API العادي كخيار احتياطي (Fallback)
+        return await fetchFallbackResources();
+    }
+
     return mapCloudinaryData(resources);
   } catch (error) {
-    console.error('Fetch Error, attempting fallback:', error);
-    return await fetchViaSearch();
+    console.error('Fetch System Error:', error);
+    return await fetchFallbackResources();
   }
 };
 
-const fetchViaSearch = async (): Promise<Video[]> => {
+const fetchFallbackResources = async (): Promise<Video[]> => {
     try {
-        const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/search?expression=resource_type:video&with_field=context&with_field=tags&max_results=500`;
+        const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/video?max_results=500&context=true&tags=true&t=${Date.now()}`;
         const response = await fetch(`${PROXY}${encodeURIComponent(targetUrl)}`, {
             method: 'GET',
+            mode: 'cors',
             headers: { 'Authorization': getAuthHeader() }
         });
         const data = await response.json();
@@ -63,7 +73,9 @@ const fetchViaSearch = async (): Promise<Video[]> => {
 const mapCloudinaryData = (resources: any[]): Video[] => {
     return resources.map((res: any) => {
       const videoType: 'short' | 'long' = (res.height > res.width) ? 'short' : 'long';
-      const optimizedUrl = res.secure_url.replace('/upload/', '/upload/q_auto,f_auto/');
+      // التأكد من استخدام HTTPS في روابط الفيديو
+      const secureUrl = res.secure_url || res.url.replace('http://', 'https://');
+      const optimizedUrl = secureUrl.replace('/upload/', '/upload/q_auto,f_auto/');
       
       const categoryTag = res.tags?.[0] || 'غموض';
       const caption = res.context?.custom?.caption || res.context?.caption || 

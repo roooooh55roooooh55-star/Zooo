@@ -69,10 +69,11 @@ const App: React.FC = () => {
       const data = await fetchCloudinaryVideos();
       setRawVideos(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("Sync Error:", err);
+      console.error("Critical Sync Error:", err);
       setRawVideos([]);
     } finally {
-      setLoading(false);
+      // إطالة وقت التحميل قليلاً لضمان استقرار الواجهة
+      setTimeout(() => setLoading(false), 800);
     }
   }, []);
 
@@ -138,10 +139,17 @@ const App: React.FC = () => {
       return <PrivacyPage onOpenAdmin={() => setIsAuthModalOpen(true)} />;
     }
 
-    if (loading && rawVideos.length === 0) return (
-      <div className="flex flex-col items-center justify-center p-20 min-h-[60vh]">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin shadow-[0_0_25px_red]"></div>
-        <p className="text-red-500 font-black mt-8 text-[10px] animate-pulse tracking-[0.3em] uppercase">يتم استحضار الأرواح...</p>
+    if (loading) return (
+      <div className="flex flex-col items-center justify-center p-20 min-h-[60vh] animate-in fade-in duration-500">
+        <div className="relative">
+            <div className="w-16 h-16 border-4 border-red-600/20 border-t-red-600 rounded-full animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-8 h-8 bg-red-600 rounded-full animate-pulse opacity-50"></div>
+            </div>
+        </div>
+        <p className="text-red-500 font-black mt-10 text-[9px] animate-pulse tracking-[0.4em] uppercase text-center">
+            جاري فتح أرشيف الأرواح...<br/><span className="text-gray-700 text-[7px] mt-2 block">Synchronizing with Cloud Edge</span>
+        </p>
       </div>
     );
 
@@ -154,7 +162,7 @@ const App: React.FC = () => {
           <p className="text-gray-500 font-bold text-sm">الحديقة فارغة حالياً.. الأرواح في راحة.</p>
           <div className="flex gap-4">
             <button onClick={loadData} className="text-red-600 font-black text-xs border border-red-600/30 px-6 py-3 rounded-2xl bg-red-600/5 active:scale-95 transition-all">تحديث ↻</button>
-            <button onClick={() => setCurrentView(AppView.PRIVACY)} className="text-gray-500 font-black text-xs border border-white/10 px-6 py-3 rounded-2xl bg-white/5 active:scale-95 transition-all">الخصوصية</button>
+            <button onClick={() => setCurrentView(AppView.PRIVACY)} className="text-gray-500 font-black text-xs border border-white/10 px-6 py-3 rounded-2xl bg-white/5 active:scale-95 transition-all">النظام</button>
           </div>
         </div>
       );
@@ -197,10 +205,10 @@ const App: React.FC = () => {
       <AIOracle />
       
       {isAuthModalOpen && (
-        <div className="fixed inset-0 z-[600] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <div className={`w-full bg-[#0a0a0a] border-2 rounded-[2.5rem] p-8 transition-all duration-300 ${authError ? 'border-red-600 shadow-[0_0_50px_red]' : 'border-white/10 shadow-2xl'}`}>
-            <h2 className="text-2xl font-black text-red-600 italic mb-2 text-right">بوابة المطور</h2>
-            <p className="text-xs text-gray-500 mb-8 text-right font-bold">الأرواح تطلب الرمز السري للمرور..</p>
+        <div className="fixed inset-0 z-[600] bg-black/95 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className={`w-full bg-[#0a0a0a] border-2 rounded-[3rem] p-10 transition-all duration-300 ${authError ? 'border-red-600 shadow-[0_0_60px_red]' : 'border-white/10 shadow-2xl'}`}>
+            <h2 className="text-2xl font-black text-red-600 italic mb-2 text-right">مصادقة المطور</h2>
+            <p className="text-xs text-gray-600 mb-10 text-right font-bold uppercase tracking-widest">Security Clearance Required</p>
             
             <form onSubmit={handleVerifySubmit} className="flex flex-col gap-6">
               <input 
@@ -208,12 +216,12 @@ const App: React.FC = () => {
                 autoFocus
                 value={authInput}
                 onChange={(e) => setAuthInput(e.target.value)}
-                placeholder="الرمز السري"
-                className={`w-full bg-white/5 border-2 rounded-2xl py-4 px-6 text-center text-xl font-bold outline-none transition-all ${authError ? 'border-red-600 text-red-500 animate-shake' : 'border-white/10 text-white focus:border-red-600'}`}
+                placeholder="رمز الوصول"
+                className={`w-full bg-white/5 border-2 rounded-2xl py-5 px-6 text-center text-2xl font-black outline-none transition-all ${authError ? 'border-red-600 text-red-500 animate-shake' : 'border-white/10 text-white focus:border-red-600'}`}
               />
               <div className="flex gap-4">
-                <button type="submit" className="flex-1 bg-red-600 text-white font-black py-4 rounded-2xl shadow-[0_0_20px_red] active:scale-95 transition-all">فتح البوابة</button>
-                <button type="button" onClick={() => { setIsAuthModalOpen(false); setAuthInput(''); setAuthError(false); }} className="px-6 bg-white/5 text-gray-400 font-bold py-4 rounded-2xl border border-white/10 active:scale-95 transition-all">تراجع</button>
+                <button type="submit" className="flex-1 bg-red-600 text-white font-black py-5 rounded-2xl shadow-[0_0_25px_red] active:scale-95 transition-all">دخول</button>
+                <button type="button" onClick={() => { setIsAuthModalOpen(false); setAuthInput(''); setAuthError(false); }} className="px-8 bg-white/5 text-gray-500 font-bold py-5 rounded-2xl border border-white/10 active:scale-95 transition-all">إلغاء</button>
               </div>
             </form>
           </div>
