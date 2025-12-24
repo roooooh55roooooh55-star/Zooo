@@ -34,7 +34,7 @@ const App: React.FC = () => {
   const [selectedShort, setSelectedShort] = useState<{ video: Video, list: Video[] } | null>(null);
   const [selectedLong, setSelectedLong] = useState<{ video: Video, list: Video[], autoNext: boolean } | null>(null);
   
-  const [refreshTrigger, setRefreshTrigger] = useState(0); // مفتاح لإجبار المكونات على التحديث
+  const [refreshTrigger, setRefreshTrigger] = useState(0); 
   const [pullDistance, setPullDistance] = useState(0);
   const touchStart = useRef<number>(0);
 
@@ -87,13 +87,8 @@ const App: React.FC = () => {
     });
   };
 
-  // وظيفة تصفير السجل وإعادة التوزيع (Hard/Soft Reset)
   const resetWatchHistory = useCallback(() => {
-    setInteractions(prev => ({
-      ...prev,
-      watchHistory: []
-    }));
-    // تغيير التريجر يضمن إعادة حساب useMemo في MainContent واختيار فيديوهات عشوائية جديدة
+    setInteractions(prev => ({ ...prev, watchHistory: [] }));
     setRefreshTrigger(prev => prev + 1);
     loadData();
     if (navigator.vibrate) navigator.vibrate(50);
@@ -104,18 +99,28 @@ const App: React.FC = () => {
     setSelectedShort({ video: v, list });
   };
 
-  const handlePlayLong = (v: Video, autoNext = false) => {
+  const handlePlayLong = (v: Video, list: Video[], autoNext = false) => {
     updateWatchHistory(v.id || v.video_url, 0.01);
-    setSelectedLong({ video: v, list: rawVideos.filter(vid => vid.type === 'long'), autoNext });
+    setSelectedLong({ video: v, list, autoNext });
   };
+
+  const handleNextLong = useCallback(() => {
+    if (!selectedLong) return;
+    const { video, list } = selectedLong;
+    const currentIndex = list.findIndex(v => (v.id === video.id || v.video_url === video.video_url));
+    if (currentIndex > -1 && currentIndex < list.length - 1) {
+      const nextVideo = list[currentIndex + 1];
+      handlePlayLong(nextVideo, list, true);
+    } else {
+      setSelectedLong(null);
+    }
+  }, [selectedLong]);
 
   const homeVideos = useMemo(() => {
     const filtered = rawVideos.filter(v => {
       const vidId = v.id || v.video_url;
       return !interactions.dislikedIds.includes(vidId);
     });
-    
-    // الترتيب الأساسي يعتمد على الأحدث، لكن MainContent سيقوم بالاختيار العشوائي
     return [...filtered].sort((a, b) => {
        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
@@ -135,25 +140,25 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (currentView) {
       case AppView.TREND:
-        return <TrendPage onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, true)} excludedIds={interactions.dislikedIds} />;
+        return <TrendPage onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, rawVideos.filter(vid => vid.type === 'long'), true)} excludedIds={interactions.dislikedIds} />;
       case AppView.SAVED:
-        return <SavedPage savedIds={interactions.savedIds} allVideos={rawVideos} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, true)} title="المحفوظات" />;
+        return <SavedPage savedIds={interactions.savedIds} allVideos={rawVideos} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, rawVideos.filter(vid => vid.type === 'long'), true)} title="المحفوظات" />;
       case AppView.LIKES:
-        return <SavedPage savedIds={interactions.likedIds} allVideos={rawVideos} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, true)} title="الإعجابات" />;
+        return <SavedPage savedIds={interactions.likedIds} allVideos={rawVideos} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, rawVideos.filter(vid => vid.type === 'long'), true)} title="الإعجابات" />;
       case AppView.UNWATCHED:
-        return <UnwatchedPage watchHistory={interactions.watchHistory} allVideos={rawVideos} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, true)} />;
+        return <UnwatchedPage watchHistory={interactions.watchHistory} allVideos={rawVideos} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, rawVideos.filter(vid => vid.type === 'long'), true)} />;
       case AppView.HIDDEN:
-        return <HiddenVideosPage interactions={interactions} allVideos={rawVideos} onRestore={(id) => setInteractions(p => ({ ...p, dislikedIds: p.dislikedIds.filter(v => v !== id) }))} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, false)} />;
+        return <HiddenVideosPage interactions={interactions} allVideos={rawVideos} onRestore={(id) => setInteractions(p => ({ ...p, dislikedIds: p.dislikedIds.filter(v => v !== id) }))} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, rawVideos.filter(vid => vid.type === 'long'), false)} />;
       case AppView.PRIVACY:
         return <PrivacyPage />;
       default:
         return (
           <MainContent 
-            key={refreshTrigger} // استخدام المفتاح لإعادة بناء المكون بالكامل عند التحديث
+            key={refreshTrigger} 
             videos={homeVideos} 
             interactions={interactions}
             onPlayShort={handlePlayShort}
-            onPlayLong={handlePlayLong}
+            onPlayLong={(v, list) => handlePlayLong(v, list, true)}
             onViewUnwatched={() => setCurrentView(AppView.UNWATCHED)}
             onResetHistory={resetWatchHistory}
             loading={loading && rawVideos.length === 0}
@@ -175,7 +180,7 @@ const App: React.FC = () => {
       onTouchEnd={() => {
         if (pullDistance > 60) {
           setRefreshing(true);
-          resetWatchHistory(); // السحب للأسفل يقوم بتجديد الفيديوهات أيضاً
+          resetWatchHistory();
         } else setPullDistance(0);
         touchStart.current = 0;
       }}
@@ -215,13 +220,13 @@ const App: React.FC = () => {
             const id = selectedLong.video.id || selectedLong.video.video_url;
             return { ...prev, savedIds: prev.savedIds.includes(id) ? prev.savedIds.filter(v => v !== id) : [...prev.savedIds, id] };
           })}
-          onNext={() => {}} 
+          onNext={handleNextLong} 
           onPrev={() => {}} 
           isLiked={interactions.likedIds.includes(selectedLong.video.id || selectedLong.video.video_url)}
           isDisliked={interactions.dislikedIds.includes(selectedLong.video.id || selectedLong.video.video_url)}
           isSaved={interactions.savedIds.includes(selectedLong.video.id || selectedLong.video.video_url)}
           onProgress={(p) => updateWatchHistory(selectedLong.video.id || selectedLong.video.video_url, p)}
-          onEnded={selectedLong.autoNext ? () => {} : undefined}
+          onEnded={handleNextLong}
         />
       )}
     </div>

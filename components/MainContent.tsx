@@ -2,15 +2,17 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { Video, UserInteractions } from '../types.ts';
 
-const getDeterministicStats = (url: string) => {
+// خوارزمية الأرقام الضخمة جداً (Viral Stats)
+export const getDeterministicStats = (url: string) => {
   let hash = 0;
   for (let i = 0; i < url.length; i++) hash = url.charCodeAt(i) + ((hash << 5) - hash);
-  const likesSeed = Math.abs(hash % 1500000) + 500000;
-  const viewsSeed = Math.abs(hash % 45000000) + 5000000;
+  // أرقام ضخمة: مشاهدات بين 10 مليون و 90 مليون، لايكات بين 900 ألف و 8 مليون
+  const viewsSeed = (Math.abs(hash % 80) + 10) * 1000000 + (Math.abs(hash % 900) * 1000);
+  const likesSeed = (Math.abs(hash % 7) + 1) * 1000000 + (Math.abs(hash % 800) * 1000);
   return { likes: likesSeed, views: viewsSeed };
 };
 
-const formatBigNumber = (num: number) => {
+export const formatBigNumber = (num: number) => {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
   if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
   return num.toString();
@@ -88,8 +90,8 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
         <p className={`font-bold text-white line-clamp-1 text-right ${isLong ? 'text-sm' : 'text-[10px]'}`}>{video.title}</p>
         <div className="flex items-center justify-between mt-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-[8px] text-red-500 font-black">{formatBigNumber(stats.likes)}</span>
-            <span className="text-[8px] text-blue-400 font-black">{formatBigNumber(stats.views)}</span>
+            <span className="text-[9px] text-red-500 font-black">{formatBigNumber(stats.likes)}</span>
+            <span className="text-[9px] text-blue-400 font-black">{formatBigNumber(stats.views)}</span>
           </div>
           {isLong && <span className="text-[7px] bg-red-600 px-1 rounded text-white font-black">LONG</span>}
         </div>
@@ -141,7 +143,7 @@ interface MainContentProps {
   videos: Video[];
   interactions: UserInteractions;
   onPlayShort: (v: Video, list: Video[]) => void;
-  onPlayLong: (v: Video, autoNext?: boolean) => void;
+  onPlayLong: (v: Video, list: Video[], autoNext?: boolean) => void;
   onViewUnwatched: () => void;
   onResetHistory: () => void;
   loading: boolean;
@@ -150,7 +152,6 @@ interface MainContentProps {
 const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayShort, onPlayLong, onViewUnwatched, onResetHistory, loading }) => {
   const watchedIds = useMemo(() => new Set(interactions.watchHistory.map(h => h.id)), [interactions.watchHistory]);
 
-  // منطق اختيار عشوائي لضمان تجديد المحتوى في كل مرة
   const shuffleArray = <T,>(array: T[]): T[] => {
     const newArr = [...array];
     for (let i = newArr.length - 1; i > 0; i--) {
@@ -163,9 +164,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
   const getSmartFilledListRandom = (pool: Video[], count: number) => {
     const unwatched = pool.filter(v => !watchedIds.has(v.id || v.video_url));
     const shuffledUnwatched = shuffleArray(unwatched);
-    
     if (shuffledUnwatched.length >= count) return shuffledUnwatched.slice(0, count);
-    
     const watched = pool.filter(v => watchedIds.has(v.id || v.video_url));
     const shuffledWatched = shuffleArray(watched);
     return [...shuffledUnwatched, ...shuffledWatched.slice(0, count - shuffledUnwatched.length)];
@@ -191,7 +190,6 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
   const allShorts = useMemo(() => videos.filter(v => v.type === 'short'), [videos]);
   const allLongs = useMemo(() => videos.filter(v => v.type === 'long'), [videos]);
 
-  // نستخدم التوزيع العشوائي في كل ريندر (أو عند تحديث الـ Pool)
   const latestShorts = useMemo(() => getSmartFilledListRandom(allShorts, 4), [allShorts, watchedIds]);
   const featuredLongs = useMemo(() => getSmartFilledListRandom(allLongs, 4), [allLongs, watchedIds]);
 
@@ -217,12 +215,8 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
 
   return (
     <div className="flex flex-col gap-14 pb-4">
-      {/* 1. الحديقة المرعبة */}
       <section>
-        <div 
-          onClick={onResetHistory}
-          className="flex items-center gap-3 mb-6 px-1 cursor-pointer group active:scale-95 transition-all"
-        >
+        <div onClick={onResetHistory} className="flex items-center gap-3 mb-6 px-1 cursor-pointer group active:scale-95 transition-all">
           <img src="https://i.top4top.io/p_3643ksmii1.jpg" className="w-10 h-10 rounded-full border-2 border-red-600 shadow-[0_0_15px_red] object-cover group-hover:shadow-[0_0_25px_red] transition-shadow" />
           <div className="flex flex-col">
             <h2 className="text-xl font-black text-red-600 italic leading-none group-hover:text-red-500">الحديقة المرعبة</h2>
@@ -235,7 +229,6 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </div>
       </section>
 
-      {/* 2. مكمل رعب */}
       {continueWatchingVideos.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-4 px-1">
@@ -245,11 +238,10 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
             </div>
             <button onClick={onViewUnwatched} className="text-[10px] text-yellow-500 font-black border-b border-yellow-500/20">عرض الكل</button>
           </div>
-          <DraggableMarquee videos={continueWatchingVideos} onPlay={(v) => v.type === 'short' ? onPlayShort(v, videos) : onPlayLong(v, true)} progressMap={unwatchedHistoryMap} />
+          <DraggableMarquee videos={continueWatchingVideos} onPlay={(v) => v.type === 'short' ? onPlayShort(v, videos) : onPlayLong(v, allLongs, true)} progressMap={unwatchedHistoryMap} />
         </section>
       )}
 
-      {/* 3. سلاسل الحديقة */}
       <section>
         <div className="flex items-center gap-3 mb-6 px-1">
           <div className="w-2.5 h-8 bg-green-500 rounded-full shadow-[0_0_15px_rgba(34,197,94,0.6)]"></div>
@@ -261,7 +253,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         <div className="flex flex-col gap-8">
           {featuredLongs.map((v) => (
             <div key={v.id || v.video_url} className="relative aspect-video rounded-[2.5rem] overflow-hidden border border-white/5 active:scale-95 transition-all shadow-2xl group">
-              <VideoPreview video={v} onClick={() => onPlayLong(v, true)} className="w-full h-full" isLong />
+              <VideoPreview video={v} onClick={() => onPlayLong(v, allLongs, true)} className="w-full h-full" isLong />
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-full bg-red-600/30 backdrop-blur-md border border-red-500/50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity z-30 pointer-events-none">
                 <svg className="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
               </div>
@@ -270,7 +262,6 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </div>
       </section>
 
-      {/* 4. اكتشافات جديدة */}
       <section>
         <div className="flex items-center gap-3 mb-6 px-1">
           <div className="w-2.5 h-8 bg-yellow-600 rounded-full shadow-[0_0_15px_yellow]"></div>
@@ -284,7 +275,6 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </div>
       </section>
 
-      {/* 5. سلاسل إضافية */}
       {remainingLongs.length > 0 && (
         <section className="mb-4">
           <div className="flex items-center gap-3 mb-6 px-1">
@@ -294,11 +284,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
               <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Explore More Series</span>
             </div>
           </div>
-          <DraggableMarquee 
-            videos={remainingLongs} 
-            onPlay={(v) => onPlayLong(v, true)} 
-            autoAnimate={true}
-          />
+          <DraggableMarquee videos={remainingLongs} onPlay={(v) => onPlayLong(v, allLongs, true)} autoAnimate={true} />
         </section>
       )}
     </div>

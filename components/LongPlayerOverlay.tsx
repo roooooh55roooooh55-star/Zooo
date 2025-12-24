@@ -46,7 +46,7 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
 
     const updateTime = () => { if (v.duration) onProgress(v.currentTime / v.duration); };
     const handleEnd = () => { 
-      if (isAutoPlay && onEnded) onEnded(); 
+      if (onEnded && isAutoPlay) onEnded(); 
       else { 
         v.currentTime = 0; 
         v.play().catch(() => {});
@@ -86,14 +86,15 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
     e.stopPropagation();
     setIsLandscape(!isLandscape);
     setShowControls(true);
+    if (navigator.vibrate) navigator.vibrate(50);
   };
 
   return (
-    <div className="fixed inset-0 bg-black z-[200] flex flex-col transition-all duration-500 overflow-hidden">
+    <div className={`fixed inset-0 bg-black z-[200] flex flex-col transition-all duration-500 overflow-hidden ${isLandscape ? 'fixed inset-0 z-[400]' : ''}`}>
       <div 
         ref={containerRef}
         className={`relative bg-black flex items-center justify-center transition-all duration-500 cursor-pointer overflow-hidden ${
-          isLandscape ? 'fixed inset-0 z-[300] w-screen h-screen' : 'flex-grow'
+          isLandscape ? 'w-full h-full' : 'flex-grow'
         }`}
         onClick={handleInteraction}
       >
@@ -101,36 +102,32 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
           ref={videoRef}
           src={video.video_url}
           style={isLandscape ? {
-            width: '100.5dvh', 
-            height: '100.5dvw',
+            width: '100dvh', // عرض الفيديو يصبح طول الشاشة في وضع التدوير
+            height: '100dvw', // طول الفيديو يصبح عرض الشاشة في وضع التدوير
             position: 'absolute',
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%) rotate(90deg)',
-            objectFit: 'cover', 
+            objectFit: 'cover', // ملء الشاشة بالكامل دون حواف سوداء
             backgroundColor: 'black'
           } : {}}
-          className={`transition-all duration-500 pointer-events-none relative z-10 ${!isLandscape ? 'w-full aspect-video object-contain shadow-[0_0_50px_rgba(0,0,0,1)]' : ''}`}
+          className={`transition-all duration-500 pointer-events-none relative z-10 ${!isLandscape ? 'w-full aspect-video object-contain' : ''}`}
           playsInline
           preload="auto"
         />
 
-        {/* أزرار التحكم العلوية */}
-        <div className={`absolute top-0 left-0 right-0 p-5 z-[350] flex justify-between items-start transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-          {/* زر التصغير - أعلى اليسار */}
+        <div className={`absolute top-0 left-0 right-0 p-6 z-[350] flex justify-between items-start transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
           {isLandscape ? (
             <button 
               onClick={toggleLandscape}
-              className="p-3 bg-black/70 backdrop-blur-xl rounded-2xl border border-white/30 text-white active:scale-90 transition-all shadow-2xl flex items-center gap-2 rotate-90"
+              className="p-3 bg-red-600/80 backdrop-blur-xl rounded-2xl border border-red-400 text-white active:scale-90 transition-all shadow-2xl rotate-90"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
                 <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
               </svg>
-              <span className="text-[10px] font-black uppercase">تصغير</span>
             </button>
           ) : <div className="w-10"></div>}
 
-          {/* زر الإغلاق - أعلى اليمين */}
           <button 
             onClick={(e) => { e.stopPropagation(); onClose(); }} 
             className="p-3 bg-black/70 backdrop-blur-xl rounded-2xl border-2 border-red-600 text-red-600 active:scale-90 transition-all shadow-[0_0_20px_rgba(220,38,38,0.7)]"
@@ -138,6 +135,12 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
+
+        {isLandscape && showControls && (
+          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 rotate-90 w-[80dvh] h-1.5 bg-white/10 rounded-full overflow-hidden z-[360]">
+             <div className="h-full bg-red-600 shadow-[0_0_10px_red]" style={{ width: `${(videoRef.current?.currentTime || 0) / (videoRef.current?.duration || 1) * 100}%` }}></div>
+          </div>
+        )}
       </div>
 
       {!isLandscape && (
@@ -151,24 +154,10 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <button 
-              onClick={(e) => { e.stopPropagation(); setIsAutoPlay(!isAutoPlay); }} 
-              className={`flex-1 flex justify-center py-4 rounded-xl border transition-all text-[9px] font-black ${isAutoPlay ? 'bg-green-600/30 border-green-500 text-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]' : 'bg-red-600/30 border-red-500 text-red-400 shadow-[0_0_15px_rgba(220,38,38,0.4)]'}`}
-            >
-              AUTO
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); onLike(); }} className={`flex-1 flex justify-center py-4 rounded-xl border transition-all ${isLiked ? 'bg-blue-600/40 border-blue-400 text-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.7)]' : 'bg-white/5 border-white/10 text-white shadow-none'}`}>
-              <svg className="w-6 h-6" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2" d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); onDislike(); }} className={`flex-1 flex justify-center py-4 rounded-xl border transition-all ${isDisliked ? 'bg-red-600/40 border-red-400 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.7)]' : 'bg-white/5 border-white/10 text-white'}`}>
-              <svg className="w-6 h-6 rotate-180" fill={isDisliked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2" d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); onSave(); }} className={`flex-1 flex justify-center py-4 rounded-xl border transition-all ${isSaved ? 'bg-yellow-500/40 border-yellow-400 text-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.7)]' : 'bg-white/5 border-white/10 text-white shadow-none'}`}>
-              <svg className="w-6 h-6" fill={isSaved ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className={`flex-1 flex justify-center py-4 rounded-xl border transition-all ${isMuted ? 'bg-red-600/20 border-red-500 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]' : 'bg-white/5 border-white/10 text-white'}`}>
-              {isMuted ? <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M5.586 15L4 16.586V7.414L5.586 9H10l5-5v16l-5-5H5.586zM17 9l4 4m0-4l-4 4"/></svg> : <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15L4 16.586V7.414L5.586 9H10l5-5v16l-5-5H5.586z"/></svg>}
-            </button>
+            <button onClick={(e) => { e.stopPropagation(); setIsAutoPlay(!isAutoPlay); }} className={`flex-1 flex justify-center py-4 rounded-xl border transition-all text-[9px] font-black ${isAutoPlay ? 'bg-green-600/30 border-green-500 text-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]' : 'bg-red-600/30 border-red-500 text-red-400 shadow-[0_0_15px_rgba(220,38,38,0.4)]'}`}>AUTO</button>
+            <button onClick={(e) => { e.stopPropagation(); onLike(); }} className={`flex-1 flex justify-center py-4 rounded-xl border transition-all ${isLiked ? 'bg-blue-600/40 border-blue-400 text-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.7)]' : 'bg-white/5 border-white/10 text-white shadow-none'}`}><svg className="w-6 h-6" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2" d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg></button>
+            <button onClick={(e) => { e.stopPropagation(); onDislike(); }} className={`flex-1 flex justify-center py-4 rounded-xl border transition-all ${isDisliked ? 'bg-red-600/40 border-red-400 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.7)]' : 'bg-white/5 border-white/10 text-white'}`}><svg className="w-6 h-6 rotate-180" fill={isDisliked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2" d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg></button>
+            <button onClick={(e) => { e.stopPropagation(); onSave(); }} className={`flex-1 flex justify-center py-4 rounded-xl border transition-all ${isSaved ? 'bg-yellow-500/40 border-yellow-400 text-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.7)]' : 'bg-white/5 border-white/10 text-white shadow-none'}`}><svg className="w-6 h-6" fill={isSaved ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg></button>
           </div>
         </div>
       )}
