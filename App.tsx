@@ -13,17 +13,23 @@ import PrivacyPage from './components/PrivacyPage.tsx';
 import HiddenVideosPage from './components/HiddenVideosPage.tsx';
 import AIOracle from './components/AIOracle.tsx';
 
+const CACHE_NAME = 'hadiqa-turbo-v6';
+
 const cacheVideoContent = async (url: string) => {
   try {
-    const cache = await caches.open('hadiqa-turbo-v5');
+    const cache = await caches.open(CACHE_NAME);
     const cachedResponse = await cache.match(url);
     if (!cachedResponse) {
       const response = await fetch(url);
       if (response.ok) {
         await cache.put(url, response.clone());
+        return true;
       }
     }
-  } catch (e) {}
+    return false;
+  } catch (e) {
+    return false;
+  }
 };
 
 const App: React.FC = () => {
@@ -36,6 +42,7 @@ const App: React.FC = () => {
   
   const [refreshTrigger, setRefreshTrigger] = useState(0); 
   const [pullDistance, setPullDistance] = useState(0);
+  const [cacheStatus, setCacheStatus] = useState<'idle' | 'caching' | 'done'>('idle');
   const touchStart = useRef<number>(0);
 
   const [interactions, setInteractions] = useState<UserInteractions>(() => {
@@ -56,7 +63,13 @@ const App: React.FC = () => {
           const prevIds = new Set(prev.map(v => v.id || v.video_url));
           const newOnes = data.filter(v => !prevIds.has(v.id || v.video_url));
           const pool = [...newOnes, ...prev];
-          pool.slice(0, 40).forEach(v => cacheVideoContent(v.video_url));
+          
+          // الكشف التلقائي عن واي فاي للتحميل المسبق
+          const conn = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+          if (conn && (conn.type === 'wifi' || conn.effectiveType === '4g')) {
+             pool.slice(0, 50).forEach(v => cacheVideoContent(v.video_url));
+          }
+          
           return pool; 
         });
       }
@@ -68,6 +81,24 @@ const App: React.FC = () => {
       setPullDistance(0);
     }
   }, []);
+
+  const handleTurboCache = async () => {
+    if (cacheStatus !== 'idle') return;
+    setCacheStatus('caching');
+    if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+    
+    let cachedCount = 0;
+    const pool = rawVideos.slice(0, 100); // تحميل أول 100 فيديو للذاكرة
+    
+    for (const video of pool) {
+      const success = await cacheVideoContent(video.video_url);
+      if (success) cachedCount++;
+    }
+    
+    setCacheStatus('done');
+    if (navigator.vibrate) navigator.vibrate(100);
+    setTimeout(() => setCacheStatus('idle'), 5000); // العودة للحالة العادية بعد 5 ثواني
+  };
 
   useEffect(() => {
     loadData();
@@ -151,6 +182,8 @@ const App: React.FC = () => {
             onPlayLong={(v, list) => handlePlayLong(v, list)}
             onViewUnwatched={() => setCurrentView(AppView.UNWATCHED)}
             onResetHistory={resetWatchHistory}
+            onTurboCache={handleTurboCache}
+            cacheStatus={cacheStatus}
             loading={loading && rawVideos.length === 0}
           />
         );

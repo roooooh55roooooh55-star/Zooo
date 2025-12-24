@@ -78,18 +78,22 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
       {/* قسم الفيديو الرئيسي */}
       <div className={`relative flex flex-col transition-all duration-500 ${isFullScreen ? 'h-full w-full bg-black' : 'h-[40vh] mt-4'}`}>
         
-        {/* أزرار التحكم العلوية (تظهر دائماً في الوضع العادي وفي زوايا مدروسة في الكامل) */}
-        <div className={`absolute top-4 left-0 right-0 px-6 flex justify-between items-center z-[220] transition-all ${isFullScreen ? 'top-8' : ''}`}>
+        {/* أزرار التحكم العلوية */}
+        <div className={`absolute px-6 flex justify-between items-center z-[220] transition-all duration-500 ${
+          isFullScreen 
+          ? 'top-0 bottom-0 right-4 flex-col py-10' 
+          : 'top-4 left-0 right-0'
+        }`}>
           <button 
             onClick={(e) => { e.stopPropagation(); onClose(); }} 
-            className="p-3 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 text-red-600 shadow-2xl active:scale-90 transition-all"
+            className={`p-3 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 text-red-600 shadow-2xl active:scale-90 transition-all ${isFullScreen ? 'rotate-90' : ''}`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
 
           <button 
             onClick={toggleFullScreen}
-            className="p-3 bg-red-600/80 backdrop-blur-xl rounded-2xl border border-red-400 text-white shadow-2xl active:scale-90 transition-all"
+            className={`p-3 bg-red-600/80 backdrop-blur-xl rounded-2xl border border-red-400 text-white shadow-2xl active:scale-90 transition-all ${isFullScreen ? 'rotate-90' : ''}`}
           >
             {isFullScreen ? (
                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
@@ -112,13 +116,13 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
             ref={videoRef}
             src={video.video_url}
             style={isFullScreen ? {
-              width: '100dvh', // عرض الفيديو يصبح طول الشاشة عند التدوير
-              height: '100dvw', // طول الفيديو يصبح عرض الشاشة عند التدوير
+              width: '100dvh', // العرض يتناسب مع طول الشاشة
+              height: '100dvw', // الطول يتناسب مع عرض الشاشة
               position: 'absolute',
               top: '50%',
               left: '50%',
-              transform: 'translate(-50%, -50%) rotate(90deg)', // تدوير إجباري للوضع الأفقي
-              objectFit: 'contain', // يحافظ على نسبة 16:9 دون قص
+              transform: 'translate(-50%, -50%) rotate(90deg)', // تدوير 90 درجة للوضع الأفقي
+              objectFit: 'cover', // ملء الشاشة بالكامل (Edge-to-Edge)
               backgroundColor: 'black'
             } : {
               width: '100%',
@@ -141,10 +145,9 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
         </div>
       </div>
 
-      {/* قسم التفاعل والمقترحات (يختفي تماماً عند التكبير لضمان تركيز 100% على الفيديو) */}
+      {/* قسم التفاعل والمقترحات */}
       {!isFullScreen && (
         <div className="flex-grow flex flex-col p-6 gap-6 overflow-hidden">
-          
           <div className="flex flex-col gap-4">
             <h2 className="text-xl font-black text-right leading-tight text-white line-clamp-2">{video.title}</h2>
             <div className="flex items-center justify-between text-[11px] font-black opacity-70">
@@ -168,7 +171,6 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
             </div>
           </div>
 
-          {/* شريط المقترحات المتحرك (من اليسار إلى اليمين) */}
           <div className="mt-auto mb-8">
             <h3 className="text-[11px] font-black text-gray-500 mb-4 text-right pr-2 italic">رحلات الرعب القادمة...</h3>
             <div className="relative overflow-hidden w-full h-28 flex items-center">
@@ -187,7 +189,6 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
               </div>
             </div>
           </div>
-
         </div>
       )}
 

@@ -6,9 +6,7 @@ import { Video, UserInteractions } from '../types.ts';
 export const getDeterministicStats = (url: string) => {
   let hash = 0;
   for (let i = 0; i < url.length; i++) hash = url.charCodeAt(i) + ((hash << 5) - hash);
-  // أرقام ضخمة: مشاهدات بين 10 مليون و 95 مليون
   const viewsSeed = (Math.abs(hash % 85) + 10) * 1000000 + (Math.abs(hash % 900) * 1000);
-  // لايكات بين مليون و 8 مليون
   const likesSeed = (Math.abs(hash % 8) + 1) * 1000000 + (Math.abs(hash % 800) * 1000);
   return { likes: likesSeed, views: viewsSeed };
 };
@@ -38,11 +36,24 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
   const isNew = useMemo(() => isRecentVideo(video), [video.created_at]);
   const [isReady, setIsReady] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [shouldPlay, setShouldPlay] = useState(false);
+  const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
-      ([entry]) => setIsVisible(entry.isIntersecting),
-      { threshold: 0.1 }
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+        if (entry.isIntersecting) {
+          // الحفاظ على الانترنت: لا يتم تشغيل الفيديو فوراً بل بعد 600ms من التوقف أمامه
+          timerRef.current = window.setTimeout(() => {
+            setShouldPlay(true);
+          }, 600);
+        } else {
+          if (timerRef.current) clearTimeout(timerRef.current);
+          setShouldPlay(false);
+        }
+      },
+      { threshold: 0.6 } // يجب أن يكون أغلب الفيديو واضحاً لبدء التشغيل
     );
     if (videoRef.current) observer.observe(videoRef.current);
     return () => observer.disconnect();
@@ -54,10 +65,12 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
     v.muted = true; 
     v.playsInline = true;
     
-    if (isVisible) {
+    if (shouldPlay && isVisible) {
       v.play().catch(() => {});
     } else {
       v.pause();
+      // العودة لأول إطار عند الخروج لتوفير الذاكرة
+      if (!isVisible) v.currentTime = 0;
     }
 
     const handleReady = () => setIsReady(true);
@@ -68,18 +81,19 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
     return () => {
       v.removeEventListener('loadeddata', handleReady);
       v.removeEventListener('timeupdate', handleTimeUpdate);
-      v.pause();
     };
-  }, [isVisible, video.video_url]);
+  }, [shouldPlay, isVisible, video.video_url]);
 
   return (
     <div onClick={onClick} className={`relative overflow-hidden cursor-pointer group bg-neutral-900 border border-white/5 transition-all active:scale-95 duration-500 animate-in fade-in zoom-in-95 ${className}`}>
+      {/* عرض الصورة المصغرة (أول إطار) لتوفير البيانات */}
       <video 
         ref={videoRef} 
         src={video.video_url} 
-        muted autoPlay loop playsInline 
-        preload="auto" 
-        className={`w-full h-full object-cover relative z-10 transition-opacity duration-700 ${isReady ? 'opacity-100' : 'opacity-0'}`} 
+        muted 
+        playsInline 
+        preload="metadata" 
+        className={`w-full h-full object-cover relative z-10 transition-opacity duration-700 ${isReady ? 'opacity-100' : 'opacity-40'}`} 
       />
       {!isReady && <div className="absolute inset-0 flex items-center justify-center z-0 bg-neutral-900 animate-pulse"><div className="w-5 h-5 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>}
       
@@ -147,10 +161,14 @@ interface MainContentProps {
   onPlayLong: (v: Video, list: Video[], autoNext?: boolean) => void;
   onViewUnwatched: () => void;
   onResetHistory: () => void;
+  onTurboCache: () => void;
+  cacheStatus: 'idle' | 'caching' | 'done';
   loading: boolean;
 }
 
-const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayShort, onPlayLong, onViewUnwatched, onResetHistory, loading }) => {
+const MainContent: React.FC<MainContentProps> = ({ 
+  videos, interactions, onPlayShort, onPlayLong, onViewUnwatched, onResetHistory, onTurboCache, cacheStatus, loading 
+}) => {
   const watchedIds = useMemo(() => new Set(interactions.watchHistory.map(h => h.id)), [interactions.watchHistory]);
 
   const shuffleArray = <T,>(array: T[]): T[] => {
@@ -217,14 +235,34 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
   return (
     <div className="flex flex-col gap-14 pb-4">
       <section>
-        <div onClick={onResetHistory} className="flex items-center gap-3 mb-6 px-1 cursor-pointer group active:scale-95 transition-all">
-          <img src="https://i.top4top.io/p_3643ksmii1.jpg" className="w-10 h-10 rounded-full border-2 border-red-600 shadow-[0_0_15px_red] object-cover group-hover:shadow-[0_0_25px_red] transition-shadow" />
-          <div className="flex flex-col">
-            <h2 className="text-xl font-black text-red-600 italic leading-none group-hover:text-red-500">الحديقة المرعبة</h2>
-            <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Tap to Refresh & Sync</span>
+        <div className="flex items-center gap-3 mb-6 px-1">
+          <div onClick={onResetHistory} className="flex items-center gap-3 cursor-pointer group active:scale-95 transition-all">
+            <img src="https://i.top4top.io/p_3643ksmii1.jpg" className="w-10 h-10 rounded-full border-2 border-red-600 shadow-[0_0_15px_red] object-cover group-hover:shadow-[0_0_25px_red] transition-shadow" />
+            <div className="flex flex-col">
+              <h2 className="text-xl font-black text-red-600 italic leading-none group-hover:text-red-500">الحديقة المرعبة</h2>
+              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Tap to Refresh & Sync</span>
+            </div>
           </div>
-          <div className="flex-grow h-[1px] bg-gradient-to-l from-red-600/40 to-transparent"></div>
+          
+          <div className="flex-grow flex justify-start pl-2">
+            <button 
+              onClick={onTurboCache}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[9px] font-black transition-all duration-500 ${
+                cacheStatus === 'done' 
+                  ? 'bg-green-600 border-green-400 text-white shadow-[0_0_15px_rgba(34,197,94,0.6)]' 
+                  : cacheStatus === 'caching'
+                  ? 'bg-yellow-500 border-yellow-400 text-black animate-pulse'
+                  : 'bg-red-600/10 border-red-600/30 text-red-500 hover:bg-red-600 hover:text-white shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+              }`}
+            >
+              <svg className={`w-3.5 h-3.5 ${cacheStatus === 'caching' ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                <path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+              </svg>
+              {cacheStatus === 'done' ? 'تم التحميل' : cacheStatus === 'caching' ? 'جاري الحفظ...' : 'تحميل للذاكرة'}
+            </button>
+          </div>
         </div>
+
         <div className="grid grid-cols-2 gap-4">
           {latestShorts.map((v) => <VideoPreview key={v.id || v.video_url} video={v} onClick={() => onPlayShort(v, allShorts)} className="aspect-[9/16] rounded-[2rem] shadow-2xl" />)}
         </div>
