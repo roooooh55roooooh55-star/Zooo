@@ -1,7 +1,7 @@
 
 import React from 'react';
 
-const PrivacyPage: React.FC = () => {
+const PrivacyPage: React.FC<{ onOpenAdmin: () => void }> = ({ onOpenAdmin }) => {
   const fullPolicyUrl = "https://www.google.com";
 
   return (
@@ -35,10 +35,15 @@ const PrivacyPage: React.FC = () => {
             className="w-full py-4 bg-red-600 border border-red-400 hover:bg-red-700 text-white font-black text-center rounded-2xl shadow-[0_0_25px_rgba(220,38,38,0.6)] transition-all active:scale-95 flex items-center justify-center gap-3 group"
           >
             <span>عرض السياسة الكاملة</span>
-            <svg className="w-5 h-5 transition-transform group-hover:translate-x-[-4px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
           </a>
+          
+          {/* الكلمة السرية لفتح لوحة التحكم */}
+          <span 
+            onClick={onOpenAdmin}
+            className="text-[10px] text-white/5 cursor-pointer mt-10 hover:text-red-900/40 transition-colors"
+          >
+            النسخة 3.5.0 - Al-Hadiqa Dev
+          </span>
         </div>
       </div>
     </div>

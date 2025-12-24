@@ -7,10 +7,10 @@ export interface Video {
   type: VideoType;
   likes: number;
   views: number;
-  title?: string;
-  thumbnail?: string;
-  category?: string;
+  title: string;
+  category: 'رعب حقيقي' | 'قصص رعب' | 'غموض' | 'ما وراء الطبيعة' | 'أرشيف المطور';
   created_at?: string;
+  public_id: string; // للحذف والتعديل في Cloudinary
 }
 
 export interface UserInteractions {
@@ -27,5 +27,6 @@ export enum AppView {
   SAVED = 'saved',
   UNWATCHED = 'unwatched',
   HIDDEN = 'hidden',
-  PRIVACY = 'privacy'
+  PRIVACY = 'privacy',
+  ADMIN = 'admin'
 }

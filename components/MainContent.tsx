@@ -107,17 +107,21 @@ const DraggableMarquee: React.FC<{ videos: Video[], interactions: UserInteractio
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
 
-  // لضمان حركة دائرية بلا فجوات، نكرر الفيديوهات إذا كان العدد قليلاً أو لتغطية مساحة الحركة
   const displayVideos = useMemo(() => {
+    if (videos.length === 0) return [];
     if (!autoAnimate) return videos;
-    // نكرر المصفوفة لضمان وجود فيديوهات كافية لتغطية الحركة الدائرية
-    const repeated = [...videos, ...videos, ...videos];
-    return repeated;
+    return [...videos, ...videos];
   }, [videos, autoAnimate]);
+
+  const animationDuration = useMemo(() => {
+    const baseDuration = 12;
+    const count = videos.length || 1;
+    return Math.max(8, (count / 10) * baseDuration);
+  }, [videos.length]);
 
   return (
     <div 
-      className={`relative marquee-container w-full overflow-x-auto scroll-smooth scrollbar-hide`}
+      className={`relative marquee-container w-full overflow-hidden scroll-smooth`}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={() => setIsPaused(true)}
@@ -125,7 +129,8 @@ const DraggableMarquee: React.FC<{ videos: Video[], interactions: UserInteractio
     >
       <div 
         ref={scrollRef}
-        className={`flex gap-4 pb-4 px-2 ${autoAnimate && !isPaused ? (reverse ? 'animate-marquee-l-to-r' : 'animate-marquee-r-to-l') : 'overflow-x-visible'}`}
+        style={{ animationDuration: `${animationDuration}s`, animationPlayState: isPaused ? 'paused' : 'running' }}
+        className={`flex gap-4 pb-4 px-2 ${autoAnimate ? (reverse ? 'animate-marquee-l-to-r' : 'animate-marquee-r-to-l') : 'overflow-x-auto scrollbar-hide'}`}
       >
         {displayVideos.map((v, i) => {
           const id = v.id || v.video_url;
@@ -160,49 +165,27 @@ interface MainContentProps {
 }
 
 const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayShort, onPlayLong, onViewUnwatched, onResetHistory, onTurboCache, cacheStatus, loading }) => {
-  const allShorts = useMemo(() => videos.filter(v => v.type === 'short'), [videos]);
-  const allLongs = useMemo(() => videos.filter(v => v.type === 'long'), [videos]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  const latestShorts = useMemo(() => allShorts.slice(0, 4), [allShorts]);
-  const featuredLongs = useMemo(() => allLongs.slice(0, 4), [allLongs]);
-  const moreShorts = useMemo(() => allShorts.slice(4, 8), [allShorts]);
-  
-  const usedIds = useMemo(() => {
-    return new Set([
-      ...latestShorts.map(v => v.id || v.video_url),
-      ...featuredLongs.map(v => v.id || v.video_url),
-      ...moreShorts.map(v => v.id || v.video_url)
-    ]);
-  }, [latestShorts, featuredLongs, moreShorts]);
-
-  // قسم رعب جداً (سابقاً أرواح هائمة)
-  const veryScaryVideos = useMemo(() => {
-    return videos.filter(v => !usedIds.has(v.id || v.video_url)).slice(0, 10);
-  }, [videos, usedIds]);
-
-  // قسم كوابيس لا تنتهي
-  const endlessNightmares = useMemo(() => {
-    const veryScaryIds = new Set(veryScaryVideos.map(v => v.id || v.video_url));
-    return videos.filter(v => !usedIds.has(v.id || v.video_url) && !veryScaryIds.has(v.id || v.video_url)).slice(0, 12);
-  }, [videos, usedIds, veryScaryVideos]);
-
-  // قسم رعب حقيقي
-  const realHorrorVideos = useMemo(() => {
-    return videos.filter(v => v.category === 'رعب حقيقي' || v.title?.includes('رعب حقيقي')).slice(0, 15);
-  }, [videos]);
-
-  // قسم أرواح ضائعة
-  const lostSouls = useMemo(() => {
-    const veryScaryIds = new Set(veryScaryVideos.map(v => v.id || v.video_url));
-    const nightmareIds = new Set(endlessNightmares.map(v => v.id || v.video_url));
-    const realHorrorIds = new Set(realHorrorVideos.map(v => v.id || v.video_url));
+  // تصفية الفيديوهات بناءً على البحث
+  const filteredVideos = useMemo(() => {
+    if (!searchQuery) return videos;
     return videos.filter(v => 
-      !usedIds.has(v.id || v.video_url) && 
-      !veryScaryIds.has(v.id || v.video_url) && 
-      !nightmareIds.has(v.id || v.video_url) &&
-      !realHorrorIds.has(v.id || v.video_url)
-    ).slice(0, 15);
-  }, [videos, usedIds, veryScaryVideos, endlessNightmares, realHorrorVideos]);
+      v.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      v.category.includes(searchQuery)
+    );
+  }, [videos, searchQuery]);
+
+  const categories = useMemo(() => {
+    return {
+      'رعب حقيقي': filteredVideos.filter(v => v.category === 'رعب حقيقي'),
+      'قصص رعب': filteredVideos.filter(v => v.category === 'قصص رعب'),
+      'غموض': filteredVideos.filter(v => v.category === 'غموض'),
+      'ما وراء الطبيعة': filteredVideos.filter(v => v.category === 'ما وراء الطبيعة'),
+      'أرشيف المطور': filteredVideos.filter(v => v.category === 'أرشيف المطور'),
+    };
+  }, [filteredVideos]);
 
   const unwatchedHistoryMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -226,15 +209,9 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
     </div>
   );
 
-  const getLionColor = () => {
-    if (cacheStatus === 'done') return 'text-green-500';
-    if (cacheStatus === 'caching') return 'text-yellow-400';
-    return 'text-red-600';
-  };
-
   return (
     <div className="flex flex-col gap-10 pb-2">
-      {/* 1. الحديقة المرعبة */}
+      {/* 1. رأس الصفحة والبحث */}
       <section>
         <div className="flex items-center justify-between mb-6 px-1">
           <div onClick={onResetHistory} className="flex items-center gap-3 cursor-pointer group active:scale-95 transition-all">
@@ -244,20 +221,38 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
               <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Shuffle The Spirits</span>
             </div>
           </div>
-          <div className="flex items-center justify-center pr-2">
+          
+          <div className="flex items-center gap-4">
+            {isSearchOpen ? (
+              <div className="flex items-center bg-white/5 border border-red-600/30 rounded-xl px-3 py-1 animate-in slide-in-from-left-4 duration-300">
+                <input 
+                  autoFocus
+                  className="bg-transparent outline-none text-xs text-white w-24 text-right"
+                  placeholder="ابحث..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onBlur={() => !searchQuery && setIsSearchOpen(false)}
+                />
+                <button onClick={() => setIsSearchOpen(false)} className="text-gray-500 mr-2">✕</button>
+              </div>
+            ) : (
+              <button 
+                onClick={() => setIsSearchOpen(true)}
+                className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-red-500 shadow-[0_0_10px_rgba(220,38,38,0.2)] active:scale-75 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </button>
+            )}
+            
             <button onClick={onTurboCache} className="relative group transition-all active:scale-75 flex flex-col items-center">
-               <div className={`absolute -inset-4 rounded-full blur-2xl transition-all duration-700 opacity-40 ${cacheStatus === 'done' ? 'bg-green-500' : cacheStatus === 'caching' ? 'bg-yellow-400 animate-pulse' : 'bg-red-600'}`}></div>
-               <ScaryNeonLion colorClass={getLionColor()} />
+               <ScaryNeonLion colorClass={cacheStatus === 'done' ? 'text-green-500' : 'text-red-600'} />
             </button>
           </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          {latestShorts.map((v) => <VideoPreview key={v.id || v.video_url} video={v} interactions={interactions} onClick={() => onPlayShort(v, allShorts)} className="aspect-[9/16] rounded-[2rem] shadow-2xl" />)}
         </div>
       </section>
 
       {/* 2. واصل الارتعاش */}
-      {continueWatchingVideos.length > 0 && (
+      {continueWatchingVideos.length > 0 && !searchQuery && (
         <section>
           <div className="flex items-center justify-between mb-4 px-1">
             <h2 className="text-lg font-black text-white italic leading-none">واصل الارتعاش</h2>
@@ -266,7 +261,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
           <DraggableMarquee 
             videos={continueWatchingVideos} 
             interactions={interactions} 
-            onPlay={(v) => v.type === 'short' ? onPlayShort(v, videos) : onPlayLong(v, allLongs, true)} 
+            onPlay={(v) => v.type === 'short' ? onPlayShort(v, videos) : onPlayLong(v, videos, true)} 
             progressMap={unwatchedHistoryMap}
             autoAnimate={true}
             reverse={true} 
@@ -274,97 +269,29 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </section>
       )}
 
-      {/* 3. رعب جداً - (أرواح هائمة سابقاً) - دائري لا ينتهي */}
-      <section>
-        <div className="flex items-center gap-3 mb-4 px-1">
-          <div className="w-2.5 h-8 bg-purple-600 rounded-full shadow-[0_0_15px_#a855f7]"></div>
-          <h2 className="text-xl font-black text-white italic leading-none">رعب جداً</h2>
-        </div>
-        <DraggableMarquee 
-          videos={veryScaryVideos} 
-          interactions={interactions} 
-          onPlay={(v) => v.type === 'short' ? onPlayShort(v, allShorts) : onPlayLong(v, allLongs, true)} 
-          autoAnimate={true}
-          reverse={false}
-        />
-      </section>
-
-      {/* 4. سلاسل الموت */}
-      <section>
-        <div className="flex items-center gap-3 mb-6 px-1">
-          <div className="w-2.5 h-8 bg-green-500 rounded-full shadow-[0_0_15px_rgba(34,197,94,0.6)]"></div>
-          <h2 className="text-xl font-black text-white italic leading-none">سلاسل الموت</h2>
-        </div>
-        <div className="flex flex-col gap-8">
-          {featuredLongs.map((v) => (
-            <VideoPreview key={v.id || v.video_url} video={v} interactions={interactions} onClick={() => onPlayLong(v, allLongs, true)} className="aspect-video rounded-[2.5rem]" isLong />
-          ))}
-        </div>
-      </section>
-
-      {/* 5. كوابيس لا تنتهي */}
-      {endlessNightmares.length > 0 && (
-        <section>
-          <div className="flex items-center gap-3 mb-4 px-1">
-            <div className="w-2.5 h-8 bg-red-800 rounded-full shadow-[0_0_15px_red]"></div>
-            <h2 className="text-xl font-black text-white italic leading-none">كوابيس لا تنتهي</h2>
-          </div>
-          <DraggableMarquee 
-            videos={endlessNightmares} 
-            interactions={interactions} 
-            onPlay={(v) => v.type === 'short' ? onPlayShort(v, allShorts) : onPlayLong(v, allLongs, true)} 
-            autoAnimate={true}
-            reverse={true}
-          />
-        </section>
-      )}
-
-      {/* 6. نبضات قصيرة */}
-      {moreShorts.length > 0 && (
-        <section>
-          <div className="flex items-center gap-3 mb-6 px-1">
-            <div className="w-2.5 h-8 bg-red-600 rounded-full shadow-[0_0_15px_red]"></div>
-            <h2 className="text-xl font-black text-white italic leading-none">نبضات قصيرة</h2>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            {moreShorts.map((v) => <VideoPreview key={v.id || v.video_url} video={v} interactions={interactions} onClick={() => onPlayShort(v, allShorts)} className="aspect-[9/16] rounded-[2rem] shadow-2xl" />)}
-          </div>
-        </section>
-      )}
-
-      {/* 7. أرواح ضائعة */}
-      {lostSouls.length > 0 && (
-        <section>
-          <div className="flex items-center gap-3 mb-4 px-1">
-            <div className="w-2.5 h-8 bg-blue-600 rounded-full shadow-[0_0_15px_#3b82f6]"></div>
-            <h2 className="text-xl font-black text-white italic leading-none">أرواح ضائعة</h2>
-          </div>
-          <DraggableMarquee 
-            videos={lostSouls} 
-            interactions={interactions} 
-            onPlay={(v) => v.type === 'short' ? onPlayShort(v, allShorts) : onPlayLong(v, allLongs, true)} 
-            autoAnimate={true}
-            reverse={false}
-          />
-        </section>
-      )}
-
-      {/* 8. رعب حقيقي */}
-      {realHorrorVideos.length > 0 && (
-        <section className="mt-2">
-          <div className="flex items-center gap-3 mb-4 px-1">
-            <div className="w-2.5 h-8 bg-orange-700 rounded-full shadow-[0_0_15px_#c2410c]"></div>
-            <h2 className="text-xl font-black text-white italic leading-none">رعب حقيقي</h2>
-          </div>
-          <DraggableMarquee 
-            videos={realHorrorVideos} 
-            interactions={interactions} 
-            onPlay={(v) => v.type === 'short' ? onPlayShort(v, allShorts) : onPlayLong(v, allLongs, true)} 
-            autoAnimate={true}
-            reverse={true} 
-          />
-        </section>
-      )}
+      {/* 3. الأقسام المخصصة */}
+      {Object.entries(categories).map(([name, list]) => (
+        list.length > 0 && (
+          <section key={name}>
+            <div className="flex items-center gap-3 mb-4 px-1">
+              <div className={`w-2.5 h-8 rounded-full shadow-[0_0_15px_rgba(255,255,255,0.4)] ${
+                name === 'رعب حقيقي' ? 'bg-red-600' : 
+                name === 'قصص رعب' ? 'bg-purple-600' :
+                name === 'غموض' ? 'bg-blue-600' :
+                name === 'ما وراء الطبيعة' ? 'bg-green-600' : 'bg-orange-600'
+              }`}></div>
+              <h2 className="text-xl font-black text-white italic leading-none">{name}</h2>
+            </div>
+            <DraggableMarquee 
+              videos={list} 
+              interactions={interactions} 
+              onPlay={(v) => v.type === 'short' ? onPlayShort(v, list) : onPlayLong(v, list, true)} 
+              autoAnimate={true}
+              reverse={name.length % 2 === 0}
+            />
+          </section>
+        )
+      ))}
 
       <div className="h-[80px] w-full bg-transparent mb-12"></div>
     </div>

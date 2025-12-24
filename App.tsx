@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Video, AppView, UserInteractions } from './types.ts';
-import { fetchVideos, updateLikesInDB } from './supabaseClient.ts';
+import { fetchCloudinaryVideos } from './cloudinaryClient.ts';
 import AppBar from './components/AppBar.tsx';
 import MainContent from './components/MainContent.tsx';
 import ShortsPlayerOverlay from './components/ShortsPlayerOverlay.tsx';
@@ -12,39 +12,20 @@ import UnwatchedPage from './components/UnwatchedPage.tsx';
 import PrivacyPage from './components/PrivacyPage.tsx';
 import HiddenVideosPage from './components/HiddenVideosPage.tsx';
 import AIOracle from './components/AIOracle.tsx';
-
-const CACHE_NAME = 'hadiqa-deep-cache-v1';
-
-const cacheVideoContent = async (url: string) => {
-  try {
-    const cache = await caches.open(CACHE_NAME);
-    const cachedResponse = await cache.match(url);
-    if (!cachedResponse) {
-      const response = await fetch(url, { mode: 'no-cors' });
-      if (response.ok || response.type === 'opaque') {
-        await cache.put(url, response.clone());
-        return true;
-      }
-    }
-    return true;
-  } catch (e) {
-    return false;
-  }
-};
+import AdminDashboard from './components/AdminDashboard.tsx';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.HOME);
   const [rawVideos, setRawVideos] = useState<Video[]>([]); 
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); 
   const [selectedShort, setSelectedShort] = useState<{ video: Video, list: Video[] } | null>(null);
   const [selectedLong, setSelectedLong] = useState<{ video: Video, list: Video[] } | null>(null);
-  
-  const [refreshTrigger, setRefreshTrigger] = useState(0); 
-  const [pullDistance, setPullDistance] = useState(0);
-  const [cacheStatus, setCacheStatus] = useState<'idle' | 'caching' | 'done'>('idle');
-  const touchStart = useRef<number>(0);
-  const isPulling = useRef<boolean>(false);
+
+  // إدارة رمز العبور
+  const [adminPassword, setAdminPassword] = useState(() => {
+    return localStorage.getItem('al-hadiqa-admin-pass') || '506070';
+  });
 
   const [interactions, setInteractions] = useState<UserInteractions>(() => {
     const saved = localStorage.getItem('al-hadiqa-interactions');
@@ -55,34 +36,17 @@ const App: React.FC = () => {
     localStorage.setItem('al-hadiqa-interactions', JSON.stringify(interactions));
   }, [interactions]);
 
-  const loadData = useCallback(async (isSilent = false) => {
-    if (!isSilent) setLoading(true);
+  const loadData = useCallback(async () => {
+    setLoading(true);
     try {
-      const data = await fetchVideos(undefined, 800);
-      if (data && data.length > 0) {
-        setRawVideos(data);
-      }
+      const data = await fetchCloudinaryVideos();
+      setRawVideos(data);
     } catch (err) {
       console.error("Sync Error:", err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
-      setPullDistance(0);
-      isPulling.current = false;
     }
   }, []);
-
-  const handleTurboCache = async () => {
-    if (cacheStatus !== 'idle') return;
-    setCacheStatus('caching');
-    if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
-    const pool = rawVideos.slice(0, 50);
-    const promises = pool.map(v => cacheVideoContent(v.video_url));
-    await Promise.all(promises);
-    setCacheStatus('done');
-    if (navigator.vibrate) navigator.vibrate(150);
-    setTimeout(() => setCacheStatus('idle'), 5000);
-  };
 
   useEffect(() => {
     loadData();
@@ -102,147 +66,73 @@ const App: React.FC = () => {
 
   const handleRefreshFeed = useCallback(() => {
     setRefreshTrigger(prev => prev + 1);
-    if (navigator.vibrate) navigator.vibrate(50);
+    loadData();
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+  }, [loadData]);
 
-  const handlePlayShort = (v: Video, list: Video[]) => {
-    updateWatchHistory(v.id || v.video_url, 0.01);
-    setSelectedShort({ video: v, list });
+  const handleVerifyAdmin = () => {
+    const pass = window.prompt("أدخل رمز عبور المطور لفتح البوابة:");
+    if (pass === adminPassword) {
+      setCurrentView(AppView.ADMIN);
+    } else if (pass !== null) {
+      alert("الرمز خاطئ.. الأرواح ترفض دخولك.");
+    }
   };
 
-  const handlePlayLong = (v: Video, list: Video[]) => {
-    updateWatchHistory(v.id || v.video_url, 0.01);
-    setSelectedLong({ video: v, list });
+  const updateAdminPassword = (newPass: string) => {
+    setAdminPassword(newPass);
+    localStorage.setItem('al-hadiqa-admin-pass', newPass);
   };
 
   const homeVideos = useMemo(() => {
     if (rawVideos.length === 0) return [];
-    const watchedIds = new Set(interactions.watchHistory.filter(h => h.progress > 0.8).map(h => h.id));
-    const savedIdsSet = new Set(interactions.savedIds);
-    
-    let pool = rawVideos.filter(v => {
-      const id = v.id || v.video_url;
-      if (interactions.dislikedIds.includes(id)) return false;
-      if (savedIdsSet.has(id)) return false;
-      return true;
-    });
-
-    const unwatched = pool.filter(v => !watchedIds.has(v.id || v.video_url));
-    const watched = pool.filter(v => watchedIds.has(v.id || v.video_url));
-
-    const shuffle = (array: Video[]) => {
-      const arr = [...array];
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
-      return arr;
-    };
-    return [...shuffle(unwatched), ...shuffle(watched)];
-  }, [rawVideos, interactions.dislikedIds, interactions.savedIds, interactions.watchHistory, refreshTrigger]);
-
-  const allLongsPool = useMemo(() => rawVideos.filter(v => v.type === 'long'), [rawVideos]);
-
-  const handleToggleLike = async (id: string) => {
-    const isLiked = interactions.likedIds.includes(id);
-    setInteractions(prev => ({
-      ...prev,
-      likedIds: isLiked ? prev.likedIds.filter(v => v !== id) : [...prev.likedIds, id],
-      dislikedIds: prev.dislikedIds.filter(v => v !== id) // إزالة من الديسك لايك إذا تم اللايك
-    }));
-    try { await updateLikesInDB(id, !isLiked); } catch (e) {}
-  };
-
-  const handleToggleDislike = (id: string) => {
-    const isDisliked = interactions.dislikedIds.includes(id);
-    setInteractions(prev => ({
-      ...prev,
-      dislikedIds: isDisliked ? prev.dislikedIds.filter(v => v !== id) : [...prev.dislikedIds, id],
-      likedIds: prev.likedIds.filter(v => v !== id) // إزالة من اللايك إذا تم الديسك لايك
-    }));
-  };
-
-  const handleToggleSave = (id: string) => {
-    setInteractions(prev => ({
-      ...prev,
-      savedIds: prev.savedIds.includes(id) ? prev.savedIds.filter(v => v !== id) : [...prev.savedIds, id]
-    }));
-  };
+    return rawVideos.filter(v => !interactions.dislikedIds.includes(v.id));
+  }, [rawVideos, interactions.dislikedIds]);
 
   const renderContent = () => {
+    if (loading && rawVideos.length === 0) return (
+      <div className="flex flex-col items-center justify-center p-20 min-h-[50vh]">
+        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin shadow-[0_0_25px_red]"></div>
+        <p className="text-red-500 font-black mt-8 text-xs animate-pulse tracking-[0.3em]">CLOUD SYNC...</p>
+      </div>
+    );
+
     switch (currentView) {
       case AppView.TREND:
-        return <TrendPage onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, allLongsPool)} excludedIds={interactions.dislikedIds} />;
+        return <TrendPage onPlayShort={(v, l) => setSelectedShort({video:v, list:l})} onPlayLong={(v) => setSelectedLong({video:v, list:rawVideos})} excludedIds={interactions.dislikedIds} />;
       case AppView.SAVED:
-        return <SavedPage savedIds={interactions.savedIds} allVideos={rawVideos} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, allLongsPool)} title="المحفوظات" />;
+        return <SavedPage savedIds={interactions.savedIds} allVideos={rawVideos} onPlayShort={(v, l) => setSelectedShort({video:v, list:l})} onPlayLong={(v) => setSelectedLong({video:v, list:rawVideos})} title="المحفوظات" />;
       case AppView.LIKES:
-        return <SavedPage savedIds={interactions.likedIds} allVideos={rawVideos} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, allLongsPool)} title="الإعجابات" />;
+        return <SavedPage savedIds={interactions.likedIds} allVideos={rawVideos} onPlayShort={(v, l) => setSelectedShort({video:v, list:l})} onPlayLong={(v) => setSelectedLong({video:v, list:rawVideos})} title="الإعجابات" />;
       case AppView.UNWATCHED:
-        return <UnwatchedPage watchHistory={interactions.watchHistory} allVideos={rawVideos} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, allLongsPool)} />;
-      case AppView.HIDDEN:
-        return <HiddenVideosPage interactions={interactions} allVideos={rawVideos} onRestore={(id) => setInteractions(p => ({ ...p, dislikedIds: p.dislikedIds.filter(v => v !== id) }))} onPlayShort={handlePlayShort} onPlayLong={(v) => handlePlayLong(v, allLongsPool)} />;
+        return <UnwatchedPage watchHistory={interactions.watchHistory} allVideos={rawVideos} onPlayShort={(v, l) => setSelectedShort({video:v, list:l})} onPlayLong={(v) => setSelectedLong({video:v, list:rawVideos})} />;
       case AppView.PRIVACY:
-        return <PrivacyPage />;
+        return <PrivacyPage onOpenAdmin={handleVerifyAdmin} />;
+      case AppView.HIDDEN:
+        return <HiddenVideosPage interactions={interactions} allVideos={rawVideos} onRestore={(id) => setInteractions(p=>({...p, dislikedIds: p.dislikedIds.filter(d=>d!==id)}))} onPlayShort={(v, l) => setSelectedShort({video:v, list:l})} onPlayLong={(v) => setSelectedLong({video:v, list:rawVideos})} />;
+      case AppView.ADMIN:
+        return <AdminDashboard onClose={() => setCurrentView(AppView.HOME)} currentPassword={adminPassword} onUpdatePassword={updateAdminPassword} />;
       default:
         return (
           <MainContent 
             key={refreshTrigger} 
             videos={homeVideos} 
             interactions={interactions}
-            onPlayShort={handlePlayShort}
-            onPlayLong={(v, list) => handlePlayLong(v, list)}
+            onPlayShort={(v, l) => setSelectedShort({video:v, list:l})}
+            onPlayLong={(v, l) => setSelectedLong({video:v, list:l})}
             onViewUnwatched={() => setCurrentView(AppView.UNWATCHED)}
             onResetHistory={handleRefreshFeed}
-            onTurboCache={handleTurboCache}
-            cacheStatus={cacheStatus}
-            loading={loading && rawVideos.length === 0}
+            onTurboCache={handleRefreshFeed}
+            cacheStatus="idle"
+            loading={loading}
           />
         );
     }
   };
 
   return (
-    <div 
-      className="min-h-screen pb-4 max-w-md mx-auto relative bg-[#050505] touch-pan-y"
-      onTouchStart={(e) => { 
-        if (window.scrollY <= 1) {
-          touchStart.current = e.touches[0].clientY;
-          isPulling.current = true;
-        } else {
-          isPulling.current = false;
-        }
-      } }
-      onTouchMove={(e) => {
-        if (isPulling.current && window.scrollY <= 1) {
-          const diff = e.touches[0].clientY - touchStart.current;
-          if (diff > 0) {
-            setPullDistance(Math.min(diff / 2, 70));
-          }
-        }
-      }}
-      onTouchEnd={() => {
-        if (pullDistance > 55) {
-          setRefreshing(true);
-          handleRefreshFeed();
-          // اختفاء فوري للعلامة
-          setPullDistance(0);
-          setTimeout(() => setRefreshing(false), 600);
-        } else {
-          setPullDistance(0);
-        }
-        touchStart.current = 0;
-        isPulling.current = false;
-      }}
-    >
+    <div className="min-h-screen pb-4 max-w-md mx-auto relative bg-[#050505] overflow-x-hidden">
       <AppBar onViewChange={setCurrentView} onRefresh={handleRefreshFeed} currentView={currentView} />
-      
-      <div className="fixed left-0 right-0 z-[60] flex justify-center transition-all pointer-events-none" style={{ top: `${pullDistance + 10}px`, opacity: pullDistance / 55 }}>
-        <div className={`p-2 bg-red-600 rounded-full shadow-[0_0_25px_red] ${refreshing || pullDistance < 10 ? 'opacity-0 scale-0' : 'opacity-100 scale-100'}`}>
-          <svg className="w-5 h-5 text-white animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4"><path d="M19 9l-7 7-7-7" /></svg>
-        </div>
-      </div>
-
       <main className="pt-24 px-4">{renderContent()}</main>
       <AIOracle />
       
@@ -252,11 +142,10 @@ const App: React.FC = () => {
           videoList={selectedShort.list} 
           interactions={interactions}
           onClose={() => setSelectedShort(null)} 
-          onLike={handleToggleLike} 
-          onDislike={handleToggleDislike} 
-          onSave={handleToggleSave} 
+          onLike={(id) => setInteractions(p => ({...p, likedIds: Array.from(new Set([...p.likedIds, id]))}))} 
+          onDislike={(id) => setInteractions(p => ({...p, dislikedIds: Array.from(new Set([...p.dislikedIds, id]))}))} 
+          onSave={(id) => setInteractions(p => ({...p, savedIds: Array.from(new Set([...p.savedIds, id]))}))} 
           onProgress={updateWatchHistory}
-          onAllEnded={() => setSelectedShort(null)}
         />
       )}
 
@@ -265,17 +154,14 @@ const App: React.FC = () => {
           video={selectedLong.video} 
           allLongVideos={selectedLong.list}
           onClose={() => setSelectedLong(null)}
-          onLike={() => handleToggleLike(selectedLong.video.id || selectedLong.video.video_url)}
-          onDislike={() => handleToggleDislike(selectedLong.video.id || selectedLong.video.video_url)}
-          onSave={() => handleToggleSave(selectedLong.video.id || selectedLong.video.video_url)}
-          onSwitchVideo={(v) => {
-            updateWatchHistory(v.id || v.video_url, 0.01);
-            setSelectedLong({ video: v, list: selectedLong.list });
-          }}
-          isLiked={interactions.likedIds.includes(selectedLong.video.id || selectedLong.video.video_url)}
-          isDisliked={interactions.dislikedIds.includes(selectedLong.video.id || selectedLong.video.video_url)}
-          isSaved={interactions.savedIds.includes(selectedLong.video.id || selectedLong.video.video_url)}
-          onProgress={(p) => updateWatchHistory(selectedLong.video.id || selectedLong.video.video_url, p)}
+          onLike={() => setInteractions(p => ({...p, likedIds: Array.from(new Set([...p.likedIds, selectedLong.video.id]))}))}
+          onDislike={() => setInteractions(p => ({...p, dislikedIds: Array.from(new Set([...p.dislikedIds, selectedLong.video.id]))}))}
+          onSave={() => setInteractions(p => ({...p, savedIds: Array.from(new Set([...p.savedIds, selectedLong.video.id]))}))}
+          onSwitchVideo={(v) => setSelectedLong({ video: v, list: selectedLong.list })}
+          isLiked={interactions.likedIds.includes(selectedLong.video.id)} 
+          isDisliked={interactions.dislikedIds.includes(selectedLong.video.id)} 
+          isSaved={interactions.savedIds.includes(selectedLong.video.id)}
+          onProgress={(p) => updateWatchHistory(selectedLong.video.id, p)}
         />
       )}
     </div>

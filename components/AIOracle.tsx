@@ -93,7 +93,10 @@ const AIOracle: React.FC = () => {
     if (isVoiceActive) {
       setIsVoiceActive(false);
       stopAllAudio();
-      if (liveSessionRef.current) liveSessionRef.current = null;
+      if (liveSessionRef.current) {
+          liveSessionRef.current.close?.();
+          liveSessionRef.current = null;
+      }
       return;
     }
 
@@ -106,7 +109,8 @@ const AIOracle: React.FC = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setIsVoiceActive(true);
       
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      // Fix: Use API_KEY directly as per guidelines
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       audioContextInRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       audioContextOutRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
 
@@ -131,6 +135,7 @@ const AIOracle: React.FC = () => {
               const int16 = new Int16Array(inputData.length);
               for (let i = 0; i < inputData.length; i++) int16[i] = inputData[i] * 32768;
               const pcmBlob = { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' };
+              // Fix: sessionPromise.then ensures data is sent only after connection
               sessionPromise.then(session => session.sendRealtimeInput({ media: pcmBlob }));
             };
             source.connect(scriptProcessor);
@@ -154,6 +159,7 @@ const AIOracle: React.FC = () => {
             const audioBase64 = msg.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
             if (audioBase64 && audioContextOutRef.current) {
               const ctx = audioContextOutRef.current;
+              // Fix: schedule the next audio chunk to start at the exact end time of the previous one
               nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
               const audioBuffer = await decodeAudioData(decode(audioBase64), ctx, 24000, 1);
               const source = ctx.createBufferSource();
@@ -164,6 +170,15 @@ const AIOracle: React.FC = () => {
               source.start(nextStartTimeRef.current);
               nextStartTimeRef.current += audioBuffer.duration;
             }
+          },
+          // Fix: Added missing onerror and onclose callbacks as per guidelines
+          onerror: (e: any) => {
+            console.error('Live API Error:', e);
+            setIsVoiceActive(false);
+          },
+          onclose: (e: any) => {
+            console.log('Live API Connection Closed:', e);
+            setIsVoiceActive(false);
           }
         }
       });

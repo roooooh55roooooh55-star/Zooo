@@ -1,7 +1,8 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { Video } from '../types';
-import { fetchTrendingVideos } from '../supabaseClient';
+// Fix: Import fetchCloudinaryVideos from the correct client
+import { fetchCloudinaryVideos } from '../cloudinaryClient';
 import { getDeterministicStats, formatBigNumber } from './MainContent';
 
 interface TrendPageProps {
@@ -17,7 +18,8 @@ const TrendPage: React.FC<TrendPageProps> = ({ onPlayShort, onPlayLong, excluded
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await fetchTrendingVideos(150);
+        // Fix: Use fetchCloudinaryVideos instead of missing fetchTrendingVideos
+        const data = await fetchCloudinaryVideos();
         setRawTrends(data || []);
       } catch (err) {
         setRawTrends([]);
