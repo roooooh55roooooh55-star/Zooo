@@ -74,10 +74,7 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
       ref={containerRef}
       className={`fixed inset-0 bg-[#050505] z-[200] flex flex-col transition-all duration-500 overflow-hidden ${isFullScreen ? 'z-[400]' : ''}`}
     >
-      
-      {/* قسم الفيديو الرئيسي */}
-      <div className={`relative flex flex-col transition-all duration-500 ${isFullScreen ? 'h-full w-full bg-black' : 'h-[40vh] mt-4'}`}>
-        
+      <div className={`relative flex flex-col transition-all duration-500 p-2 ${isFullScreen ? 'h-full w-full bg-black p-0' : 'h-[40vh] mt-4'}`}>
         <div className={`absolute px-6 flex justify-between items-center z-[220] transition-all duration-500 ${
           isFullScreen 
           ? 'top-0 bottom-0 right-6 flex-col py-6' 
@@ -89,25 +86,18 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="4"><path d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
-
           <button 
             onClick={toggleFullScreen}
             className={`p-3 bg-red-600/80 backdrop-blur-xl rounded-2xl border-2 border-red-400 text-white shadow-[0_0_25px_red] active:scale-90 transition-all ${isFullScreen ? 'rotate-90' : ''}`}
           >
-            {isFullScreen ? (
-               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
-                 <path d="M9 9L4 4m0 0h4m-4 0v4m11 1l5 5m0 0h-4m4 0v-4" />
-               </svg>
-            ) : (
-               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
-                 <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
-               </svg>
-            )}
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+              <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+            </svg>
           </button>
         </div>
 
         <div 
-          className="relative w-full h-full bg-black flex items-center justify-center cursor-pointer overflow-hidden"
+          className="relative w-full h-full bg-black flex items-center justify-center cursor-pointer overflow-hidden border border-red-600 ring-1 ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.3)] rounded-2xl"
           onClick={() => setIsPaused(!isPaused)}
         >
           <video 
@@ -121,18 +111,13 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
               left: '50%',
               transform: 'translate(-50%, -50%) rotate(90deg)',
               objectFit: 'cover',
-              backgroundColor: 'black'
             } : {
               width: '100%',
               height: '100%',
               objectFit: 'contain'
             }}
-            playsInline
-            preload="auto"
-            muted={isMuted}
-            autoPlay
+            playsInline preload="auto" muted={isMuted} autoPlay
           />
-
           {isPaused && !isFullScreen && (
             <div className="absolute inset-0 flex items-center justify-center z-[215] bg-black/20">
                <div className="w-16 h-16 rounded-full bg-red-600/60 backdrop-blur-md flex items-center justify-center border-2 border-red-400 shadow-[0_0_30px_red] animate-pulse">
@@ -145,14 +130,12 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
 
       {!isFullScreen && (
         <div className="flex-grow flex flex-col p-6 gap-6 overflow-hidden">
-          
           <div className="flex flex-col gap-4">
             <h2 className="text-xl font-black text-right leading-tight text-white line-clamp-2">{video.title}</h2>
             <div className="flex items-center justify-between text-[11px] font-black opacity-70">
               <span className="text-blue-400">{formatBigNumber(stats.views)} مشاهدة حديقة</span>
               <span className="text-red-500">{formatBigNumber(stats.likes)} إعجاب رعب</span>
             </div>
-
             <div className="grid grid-cols-4 gap-4">
               <button onClick={onLike} className={`py-4 rounded-[1.5rem] border-2 transition-all flex justify-center items-center ${isLiked ? 'neon-btn-blue bg-blue-600/30' : 'bg-white/5 border-white/10 text-white hover:neon-btn-blue'}`}>
                 <svg className="w-6 h-6" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
@@ -168,49 +151,8 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
               </button>
             </div>
           </div>
-
-          <div className="mt-auto mb-8">
-            <h3 className="text-[11px] font-black text-gray-500 mb-4 text-right pr-2 italic">رحلات الرعب القادمة...</h3>
-            <div className="relative overflow-hidden w-full h-28 flex items-center">
-              <div className="flex gap-4 animate-marquee-lr hover:pause-animation">
-                {[...suggestions, ...suggestions, ...suggestions].map((s, i) => (
-                  <div 
-                    key={`${s.id || s.video_url}-${i}`}
-                    onClick={() => onSwitchVideo(s)}
-                    className="flex-shrink-0 w-44 aspect-video rounded-2xl overflow-hidden border border-white/10 relative shadow-2xl active:scale-95 transition-all group/item cursor-pointer bg-neutral-900"
-                  >
-                    <video 
-                      src={s.video_url} 
-                      muted 
-                      playsInline 
-                      preload="metadata" 
-                      className="w-full h-full object-cover opacity-60 group-hover/item:opacity-100 transition-opacity" 
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent"></div>
-                    <p className="absolute bottom-2 right-2 left-2 text-[9px] font-bold text-white text-right line-clamp-1">{s.title}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
         </div>
       )}
-
-      <style>{`
-        @keyframes marquee-lr {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(50%); }
-        }
-        .animate-marquee-lr {
-          display: flex;
-          width: max-content;
-          animation: marquee-lr 25s linear infinite;
-        }
-        .hover\\:pause-animation:hover {
-          animation-play-state: paused;
-        }
-      `}</style>
     </div>
   );
 };
