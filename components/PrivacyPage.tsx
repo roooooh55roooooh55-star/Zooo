@@ -37,13 +37,15 @@ const PrivacyPage: React.FC<{ onOpenAdmin: () => void }> = ({ onOpenAdmin }) => 
             <span>عرض السياسة الكاملة</span>
           </a>
           
-          {/* الكلمة السرية لفتح لوحة التحكم */}
-          <span 
-            onClick={onOpenAdmin}
-            className="text-[10px] text-white/5 cursor-pointer mt-10 hover:text-red-900/40 transition-colors"
-          >
-            النسخة 3.5.0 - Al-Hadiqa Dev
-          </span>
+          <div className="mt-10 flex flex-col items-center gap-2">
+            <span 
+              onClick={onOpenAdmin}
+              className="text-[10px] text-white/5 cursor-pointer hover:text-red-900/40 transition-colors p-4"
+            >
+              النسخة 3.5.0 - Al-Hadiqa Dev
+            </span>
+            <p className="text-[7px] text-gray-800 font-bold uppercase tracking-widest">Secure Core v4.2</p>
+          </div>
         </div>
       </div>
     </div>

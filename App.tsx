@@ -22,10 +22,13 @@ const App: React.FC = () => {
   const [selectedShort, setSelectedShort] = useState<{ video: Video, list: Video[] } | null>(null);
   const [selectedLong, setSelectedLong] = useState<{ video: Video, list: Video[] } | null>(null);
 
-  // إدارة رمز العبور
+  // إدارة رمز العبور والتحقق
   const [adminPassword, setAdminPassword] = useState(() => {
     return localStorage.getItem('al-hadiqa-admin-pass') || '506070';
   });
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authInput, setAuthInput] = useState('');
+  const [authError, setAuthError] = useState(false);
 
   const [interactions, setInteractions] = useState<UserInteractions>(() => {
     const saved = localStorage.getItem('al-hadiqa-interactions');
@@ -70,12 +73,17 @@ const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [loadData]);
 
-  const handleVerifyAdmin = () => {
-    const pass = window.prompt("أدخل رمز عبور المطور لفتح البوابة:");
-    if (pass === adminPassword) {
+  const handleVerifySubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (authInput === adminPassword) {
+      setIsAuthModalOpen(false);
+      setAuthInput('');
+      setAuthError(false);
       setCurrentView(AppView.ADMIN);
-    } else if (pass !== null) {
-      alert("الرمز خاطئ.. الأرواح ترفض دخولك.");
+    } else {
+      setAuthError(true);
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+      setTimeout(() => setAuthError(false), 2000);
     }
   };
 
@@ -107,7 +115,7 @@ const App: React.FC = () => {
       case AppView.UNWATCHED:
         return <UnwatchedPage watchHistory={interactions.watchHistory} allVideos={rawVideos} onPlayShort={(v, l) => setSelectedShort({video:v, list:l})} onPlayLong={(v) => setSelectedLong({video:v, list:rawVideos})} />;
       case AppView.PRIVACY:
-        return <PrivacyPage onOpenAdmin={handleVerifyAdmin} />;
+        return <PrivacyPage onOpenAdmin={() => setIsAuthModalOpen(true)} />;
       case AppView.HIDDEN:
         return <HiddenVideosPage interactions={interactions} allVideos={rawVideos} onRestore={(id) => setInteractions(p=>({...p, dislikedIds: p.dislikedIds.filter(d=>d!==id)}))} onPlayShort={(v, l) => setSelectedShort({video:v, list:l})} onPlayLong={(v) => setSelectedLong({video:v, list:rawVideos})} />;
       case AppView.ADMIN:
@@ -136,6 +144,43 @@ const App: React.FC = () => {
       <main className="pt-24 px-4">{renderContent()}</main>
       <AIOracle />
       
+      {/* نافذة التحقق المخصصة */}
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 z-[600] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className={`w-full bg-[#0a0a0a] border-2 rounded-[2.5rem] p-8 transition-all duration-300 ${authError ? 'border-red-600 shadow-[0_0_50px_red]' : 'border-white/10 shadow-2xl'}`}>
+            <h2 className="text-2xl font-black text-red-600 italic mb-2 text-right">بوابة المطور</h2>
+            <p className="text-xs text-gray-500 mb-8 text-right font-bold">الأرواح تطلب الرمز السري للمرور..</p>
+            
+            <form onSubmit={handleVerifySubmit} className="flex flex-col gap-6">
+              <input 
+                type="password"
+                autoFocus
+                value={authInput}
+                onChange={(e) => setAuthInput(e.target.value)}
+                placeholder="الرمز السري"
+                className={`w-full bg-white/5 border-2 rounded-2xl py-4 px-6 text-center text-xl font-bold outline-none transition-all ${authError ? 'border-red-600 text-red-500 animate-shake' : 'border-white/10 text-white focus:border-red-600'}`}
+              />
+              <div className="flex gap-4">
+                <button 
+                  type="submit"
+                  className="flex-1 bg-red-600 text-white font-black py-4 rounded-2xl shadow-[0_0_20px_red] active:scale-95 transition-all"
+                >
+                  فتح البوابة
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => { setIsAuthModalOpen(false); setAuthInput(''); setAuthError(false); }}
+                  className="px-6 bg-white/5 text-gray-400 font-bold py-4 rounded-2xl border border-white/10 active:scale-95 transition-all"
+                >
+                  تراجع
+                </button>
+              </div>
+            </form>
+            {authError && <p className="text-red-500 text-xs font-black mt-6 text-center animate-pulse">الرمز خاطئ.. الأرواح غاضبة!</p>}
+          </div>
+        </div>
+      )}
+
       {selectedShort && (
         <ShortsPlayerOverlay 
           initialVideo={selectedShort.video} 
@@ -164,6 +209,15 @@ const App: React.FC = () => {
           onProgress={(p) => updateWatchHistory(selectedLong.video.id, p)}
         />
       )}
+
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-10px); }
+          75% { transform: translateX(10px); }
+        }
+        .animate-shake { animation: shake 0.2s ease-in-out 0s 2; }
+      `}</style>
     </div>
   );
 };

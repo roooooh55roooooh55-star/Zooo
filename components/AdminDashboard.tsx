@@ -16,6 +16,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
   const [loading, setLoading] = useState(true);
   const [newPassInput, setNewPassInput] = useState(currentPassword);
   const [showPassSettings, setShowPassSettings] = useState(false);
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
   const loadVideos = async () => {
     setLoading(true);
@@ -28,9 +29,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
 
   const handleDelete = async (pid: string) => {
     if (window.confirm('هل أنت متأكد من حذف هذا الفيديو نهائياً من Cloudinary؟')) {
+      setIsProcessing(pid);
       const ok = await deleteCloudinaryVideo(pid);
-      if (ok) loadVideos();
+      if (ok) {
+        alert('تم الحذف بنجاح');
+        loadVideos();
+      } else {
+        alert('فشل الحذف. تأكد من اتصال الإنترنت.');
+      }
+      setIsProcessing(null);
     }
+  };
+
+  const handleUpdate = async (v: Video, newTitle: string, newCategory: any) => {
+    setIsProcessing(v.public_id);
+    const ok = await updateCloudinaryMetadata(v.public_id, newTitle, newCategory);
+    if (ok) {
+      console.log('Metadata updated');
+    }
+    setIsProcessing(null);
   };
 
   const handleUpdatePassword = () => {
@@ -44,6 +61,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
   };
 
   const openUploadWidget = () => {
+    if (!(window as any).cloudinary) {
+      alert("جاري تحميل أداة الرفع.. انتظر ثوانٍ");
+      return;
+    }
     (window as any).cloudinary.openUploadWidget(
       {
         cloudName: 'dlrvn33p0',
@@ -61,13 +82,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
   };
 
   return (
-    <div className="fixed inset-0 z-[300] bg-[#050505] overflow-y-auto p-6 font-sans text-right" dir="rtl">
+    <div className="fixed inset-0 z-[300] bg-[#050505] overflow-y-auto p-6 font-sans text-right pb-24" dir="rtl">
       <div className="flex items-center justify-between mb-8 border-b border-red-600/30 pb-4">
         <h1 className="text-2xl font-black text-red-600 italic">لوحة تحكم المطور</h1>
         <button onClick={onClose} className="bg-white/5 p-2 rounded-lg text-gray-400">إغلاق</button>
       </div>
 
-      {/* قسم إعدادات الأمان */}
       <div className="mb-6">
         <button 
           onClick={() => setShowPassSettings(!showPassSettings)}
@@ -109,37 +129,44 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
       </div>
 
       <div className="space-y-4">
-        <h2 className="text-lg font-bold">إدارة الفيديوهات ({videos.length})</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold">إدارة الفيديوهات ({videos.length})</h2>
+          <button onClick={loadVideos} className="text-[10px] text-blue-500">تحديث القائمة ↻</button>
+        </div>
+        
         {loading ? (
-          <div className="py-10 text-center animate-pulse text-red-500">جاري الاتصال بالسحابة...</div>
+          <div className="py-20 flex flex-col items-center gap-4 text-center">
+            <div className="w-8 h-8 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="animate-pulse text-red-500 text-xs font-black uppercase">جاري الاتصال بالسحابة عبر Proxy...</p>
+          </div>
         ) : (
           videos.map(v => (
-            <div key={v.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3">
+            <div key={v.id} className={`bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3 transition-opacity ${isProcessing === v.public_id ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
               <div className="flex items-center gap-4">
-                <div className="w-20 aspect-video bg-black rounded-lg overflow-hidden shrink-0">
+                <div className="w-20 aspect-video bg-black rounded-lg overflow-hidden shrink-0 border border-white/5">
                   <video src={v.video_url} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-grow">
                   <input 
-                    className="bg-transparent border-b border-white/10 w-full text-sm font-bold mb-1 focus:border-red-600 outline-none"
+                    className="bg-transparent border-b border-white/10 w-full text-sm font-bold mb-1 focus:border-red-600 outline-none transition-colors"
                     defaultValue={v.title}
-                    onBlur={async (e) => await updateCloudinaryMetadata(v.public_id, e.target.value, v.category)}
+                    onBlur={(e) => handleUpdate(v, e.target.value, v.category)}
                   />
                   <select 
-                    className="bg-black/40 text-[10px] text-red-500 outline-none"
+                    className="bg-black/40 text-[10px] text-red-500 outline-none rounded px-1"
                     defaultValue={v.category}
-                    onChange={async (e) => await updateCloudinaryMetadata(v.public_id, v.title, e.target.value)}
+                    onChange={(e) => handleUpdate(v, v.title, e.target.value)}
                   >
-                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    {CATEGORIES.map(c => <option key={c} value={c} className="bg-black">{c}</option>)}
                   </select>
                 </div>
               </div>
               <div className="flex gap-2 justify-end border-t border-white/5 pt-3">
                 <button 
                   onClick={() => handleDelete(v.public_id)}
-                  className="px-4 py-1.5 bg-red-900/40 text-red-500 text-xs font-bold rounded-lg border border-red-500/20"
+                  className="px-4 py-1.5 bg-red-900/20 text-red-500 text-xs font-bold rounded-lg border border-red-500/20 hover:bg-red-600 hover:text-white transition-all"
                 >
-                  حذف نهائي
+                  {isProcessing === v.public_id ? 'جاري...' : 'حذف نهائي'}
                 </button>
               </div>
             </div>
