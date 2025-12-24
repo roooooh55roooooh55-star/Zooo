@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
 
 interface Message {
@@ -56,12 +56,27 @@ const AIOracle: React.FC = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // تتبع الحد اليومي
+  const [voiceLimit, setVoiceLimit] = useState(() => {
+    const saved = localStorage.getItem('al-hadiqa-voice-limit');
+    const today = new Date().toDateString();
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.date === today) return parsed.count;
+    }
+    return 0;
+  });
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioContextInRef = useRef<AudioContext | null>(null);
   const audioContextOutRef = useRef<AudioContext | null>(null);
   const liveSessionRef = useRef<any>(null);
   const nextStartTimeRef = useRef<number>(0);
   const activeSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+  
+  // مراجع للنصوص الجارية (للمحاكاة النصية أثناء الكلام)
+  const currentInputTranscription = useRef('');
+  const currentOutputTranscription = useRef('');
 
   useEffect(() => {
     localStorage.setItem('al-hadiqa-ai-history', JSON.stringify(messages));
@@ -69,6 +84,11 @@ const AIOracle: React.FC = () => {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  useEffect(() => {
+    const today = new Date().toDateString();
+    localStorage.setItem('al-hadiqa-voice-limit', JSON.stringify({ count: voiceLimit, date: today }));
+  }, [voiceLimit]);
 
   const stopAllAudio = () => {
     activeSourcesRef.current.forEach(source => {
@@ -80,13 +100,15 @@ const AIOracle: React.FC = () => {
 
   const handleToggleVoice = async () => {
     if (isVoiceActive) {
-      // إغلاق الجلسة
       setIsVoiceActive(false);
       stopAllAudio();
-      if (liveSessionRef.current) {
-        // ننهي الجلسة (قد تختلف حسب التنفيذ ولكن سنقوم بإعادة الضبط)
-        liveSessionRef.current = null;
-      }
+      if (liveSessionRef.current) liveSessionRef.current = null;
+      return;
+    }
+
+    // تحقق من الحد اليومي (5 أسئلة)
+    if (voiceLimit >= 5) {
+      alert("لقد استنفدت طاقتك الصوتية لهذا اليوم.. الأرواح متعبة. يمكنك إرسال رسائل نصية فقط.");
       return;
     }
 
@@ -94,20 +116,22 @@ const AIOracle: React.FC = () => {
       setIsVoiceActive(true);
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
       
-      // إعداد سياق الصوت
       audioContextInRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       audioContextOutRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       
+      // طلب الإذن بالميكروفون فقط عند النقر
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
           responseModalities: [Modality.AUDIO],
+          inputAudioTranscription: {}, // تمكين تحويل كلام المستخدم لنص
+          outputAudioTranscription: {}, // تمكين تحويل رد الـ AI لنص
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } }, // صوت نسائي
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } }, // صوت أنثوي
           },
-          systemInstruction: "أنت 'الحديقة المرعبة AI'. روح أنثوية شريرة تسكن هذه الحديقة. تحدث بنبرة مرعبة، غامضة، وبصوت خافت ومخيف. اجعل ردودك قصيرة جداً ومثيرة للقلق. لا تتوقف عن الاستماع أبداً. إذا قاطعك المستخدم، توقف فوراً عن الكلام. انتظر صمت المستخدم تماماً قبل الرد.",
+          systemInstruction: "أنت 'الحديقة المرعبة AI'. كيان أنثوي غامض ومرعب. تحدث بالعربية الفصحى بنبرة باردة ومخيفة. لا تتحدث كثيراً. استمع جيداً، وعندما يتوقف المستخدم عن الكلام، قم بالرد فوراً. إذا تكلم المستخدم أثناء ردك، اصمت فوراً.",
         },
         callbacks: {
           onopen: () => {
@@ -132,11 +156,41 @@ const AIOracle: React.FC = () => {
             scriptProcessor.connect(audioContextInRef.current!.destination);
           },
           onmessage: async (msg: LiveServerMessage) => {
-            // معالجة مقاطعة المستخدم (Interruption)
+            // معالجة مقاطعة المستخدم
             if (msg.serverContent?.interrupted) {
               stopAllAudio();
+              currentOutputTranscription.current = "";
             }
 
+            // معالجة النصوص المحولة من كلام المستخدم
+            if (msg.serverContent?.inputTranscription) {
+              currentInputTranscription.current += msg.serverContent.inputTranscription.text;
+            }
+
+            // معالجة نصوص رد الـ AI
+            if (msg.serverContent?.outputTranscription) {
+              currentOutputTranscription.current += msg.serverContent.outputTranscription.text;
+            }
+
+            // عند اكتمال الدور (التوقف عن الكلام)
+            if (msg.serverContent?.turnComplete) {
+              if (currentInputTranscription.current) {
+                const userTxt = currentInputTranscription.current;
+                const aiTxt = currentOutputTranscription.current;
+                
+                setMessages(prev => [
+                  ...prev, 
+                  { role: 'user', text: userTxt },
+                  { role: 'model', text: aiTxt || "..." }
+                ]);
+                
+                setVoiceLimit(prev => prev + 1);
+                currentInputTranscription.current = "";
+                currentOutputTranscription.current = "";
+              }
+            }
+
+            // معالجة الصوت المستلم
             const audioBase64 = msg.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
             if (audioBase64 && audioContextOutRef.current) {
               const ctx = audioContextOutRef.current;
@@ -160,7 +214,7 @@ const AIOracle: React.FC = () => {
       liveSessionRef.current = await sessionPromise;
 
     } catch (err) {
-      console.error("Voice Error:", err);
+      console.error("Voice Connection Error:", err);
       setIsVoiceActive(false);
     }
   };
@@ -179,14 +233,13 @@ const AIOracle: React.FC = () => {
         model: 'gemini-3-flash-preview',
         contents: userMsg,
         config: {
-          systemInstruction: "أنت 'الحديقة المرعبة AI'، ذكاء اصطناعي مرعب وغامض. وظيفتك هي التحدث مع المستخدمين بأسلوب غامض ومخيف حول قصص الرعب. اجعل إجاباتك قصيرة ومثيرة للرهبة باللغة العربية.",
+          systemInstruction: "أنت 'الحديقة المرعبة AI'. روح غامضة ترد بإجابات مرعبة وقصيرة.",
         },
       });
 
-      const aiText = response.text || "لقد انقطع الاتصال بالعالم الآخر...";
-      setMessages(prev => [...prev, { role: 'model', text: aiText }]);
+      setMessages(prev => [...prev, { role: 'model', text: response.text || "لقد حل الصمت..." }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'model', text: "الأرواح غاضبة الآن..." }]);
+      setMessages(prev => [...prev, { role: 'model', text: "القوى الأخرى تمنعني من الرد.." }]);
     } finally {
       setLoading(false);
     }
@@ -207,8 +260,13 @@ const AIOracle: React.FC = () => {
             <div className="flex items-center gap-3">
               <img src="https://i.top4top.io/p_3643ksmii1.jpg" className="w-10 h-10 rounded-full border-2 border-red-600 shadow-[0_0_10px_red]" />
               <div className="flex flex-col">
-                <h2 className="text-sm font-black text-red-600 italic leading-none">الحديقة المرعبة AI</h2>
-                <span className="text-[7px] text-gray-500 uppercase tracking-widest mt-1">Experimental Horror Entity</span>
+                <div className="flex items-center gap-2">
+                   <h2 className="text-sm font-black text-red-600 italic leading-none uppercase">الحديقة المرعبة AI</h2>
+                   {voiceLimit < 5 && <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-ping"></span>}
+                </div>
+                <span className="text-[7px] text-gray-500 uppercase tracking-widest mt-1">
+                   {voiceLimit >= 5 ? "Voice Limit Reached (Use Text)" : `Voice Sessions: ${5 - voiceLimit} left today`}
+                </span>
               </div>
             </div>
             <button onClick={() => { setIsOpen(false); if(isVoiceActive) handleToggleVoice(); }} className="text-gray-400 hover:text-white p-2">
@@ -220,7 +278,7 @@ const AIOracle: React.FC = () => {
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center mt-20 opacity-30 text-center">
                  <img src="https://i.top4top.io/p_3643ksmii1.jpg" className="w-20 h-20 rounded-full mb-4 grayscale" />
-                 <p className="text-xs font-bold italic">الأرواح تنتظر همسك في ظلام الحديقة...</p>
+                 <p className="text-xs font-bold italic">الأرواح تتوق لسماع صوتك.. هل تجرؤ؟</p>
               </div>
             )}
             {messages.map((msg, i) => (
@@ -237,14 +295,16 @@ const AIOracle: React.FC = () => {
             )}
           </div>
 
-          {/* أزرار التحكم - المايك والدردشة النصية */}
           <div className="flex flex-col gap-4">
             {isVoiceActive && (
-              <div className="flex flex-col items-center justify-center py-4 animate-pulse">
-                 <div className="w-16 h-16 rounded-full bg-red-600/20 border-2 border-red-500 flex items-center justify-center shadow-[0_0_30px_red]">
-                    <div className="w-8 h-8 bg-red-600 rounded-full animate-ping"></div>
+              <div className="flex flex-col items-center justify-center py-4">
+                 <div className="relative">
+                   <div className="absolute inset-0 bg-red-600 rounded-full animate-ping opacity-20 scale-150"></div>
+                   <div className="w-20 h-20 rounded-full bg-red-600/20 border-2 border-red-500 flex items-center justify-center shadow-[0_0_40px_red]">
+                      <svg className="w-10 h-10 text-red-600 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/></svg>
+                   </div>
                  </div>
-                 <p className="text-[9px] text-red-500 font-black mt-4 uppercase tracking-[0.2em]">تحدث الآن.. سيد الحديقة يسمعك</p>
+                 <p className="text-[10px] text-red-500 font-black mt-6 uppercase tracking-[0.3em]">الأرواح تصغي إليك في صمت..</p>
               </div>
             )}
 
@@ -263,7 +323,7 @@ const AIOracle: React.FC = () => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="أرسل رسالة نصية للحديقة..."
+                placeholder="أرسل همسك كتابياً..."
                 className="flex-grow bg-transparent text-white p-3 text-sm focus:outline-none text-right placeholder:text-gray-700 font-bold"
                 dir="rtl"
                 disabled={isVoiceActive}
@@ -271,7 +331,7 @@ const AIOracle: React.FC = () => {
 
               <button 
                 onClick={handleSendMessage}
-                disabled={isVoiceActive}
+                disabled={isVoiceActive || !input.trim()}
                 className={`p-4 rounded-2xl shadow-xl active:scale-90 transition-all ${isVoiceActive ? 'bg-gray-800 text-gray-600' : 'bg-red-600 text-white border border-red-400'}`}
               >
                 <svg className="w-6 h-6 rotate-180" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
