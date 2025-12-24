@@ -48,7 +48,6 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
         });
       }
 
-      // Preload next videos
       [1, 2].forEach(offset => {
         const nextIdx = currentIndex + offset;
         if (nextIdx < videoList.length) {
@@ -60,7 +59,6 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
       });
     }
     
-    // Cleanup far-away videos
     Object.keys(videoRefs.current).forEach((key) => {
       const idx = parseInt(key);
       const vid = videoRefs.current[idx];
@@ -89,10 +87,10 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
         setCurrentIndex(nextIndex);
         containerRef.current?.scrollTo({ top: nextIndex * containerRef.current.clientHeight, behavior: 'smooth' });
       } else {
-        // عند الوصول للنهاية، اختر فيديو عشوائياً من القائمة (Endless Loop)
-        const randomIdx = Math.floor(Math.random() * videoList.length);
-        setCurrentIndex(randomIdx);
-        containerRef.current?.scrollTo({ top: randomIdx * containerRef.current.clientHeight, behavior: 'smooth' });
+        // العودة للبداية عند انتهاء القائمة (Loop back to start)
+        const firstIndex = 0;
+        setCurrentIndex(firstIndex);
+        containerRef.current?.scrollTo({ top: firstIndex, behavior: 'smooth' });
       }
     }
   };

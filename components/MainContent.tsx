@@ -43,7 +43,6 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
       ([entry]) => {
         setIsVisible(entry.isIntersecting);
         if (entry.isIntersecting) {
-          // الحفاظ على الانترنت: لا يتم تشغيل الفيديو فوراً بل بعد 600ms من التوقف أمامه
           timerRef.current = window.setTimeout(() => {
             setShouldPlay(true);
           }, 600);
@@ -84,7 +83,6 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
 
   return (
     <div onClick={onClick} className={`relative overflow-hidden cursor-pointer group bg-neutral-900 border border-white/5 transition-all active:scale-95 duration-500 animate-in fade-in zoom-in-95 ${className}`}>
-      {/* عرض الصورة المصغرة (أول إطار) لتوفير البيانات والسرعة */}
       <video 
         ref={videoRef} 
         src={video.video_url} 
@@ -135,7 +133,6 @@ const DraggableMarquee: React.FC<DraggableMarqueeProps> = ({ videos, onPlay, pro
           return (
             <div key={`${video.id || video.video_url}-${i}`} onClick={() => onPlay(video)} className="flex-shrink-0 w-56 group cursor-pointer">
               <div className="relative rounded-[2rem] overflow-hidden aspect-video bg-neutral-900 border border-white/10 shadow-xl transition-all group-active:scale-95 group-hover:border-red-500/30">
-                {/* استخدام الفيديو كصورة مصغرة صامتة وغير متحركة لتوفير البيانات ومنع تقطيع الفيديو الرئيسي */}
                 <video 
                   src={video.video_url} 
                   muted 
@@ -158,6 +155,23 @@ const DraggableMarquee: React.FC<DraggableMarqueeProps> = ({ videos, onPlay, pro
     </div>
   );
 };
+
+const LionIcon = ({ color }: { color: string }) => (
+  <svg viewBox="0 0 24 24" className="w-8 h-8 drop-shadow-[0_0_8px_currentColor]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" className="opacity-20" fill="currentColor" />
+    <path d="M12 7c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+    <path d="M7 10c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2z" />
+    <path d="M13 10c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2z" />
+    <path d="M12 14v4" />
+    <path d="M10 16h4" />
+    <path d="M8 20c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2" />
+    <path d="M5 12c-1.1 0-2-.9-2-2s.9-2 2-2" />
+    <path d="M19 12c1.1 0 2-.9 2-2s-.9-2-2-2" />
+    <path d="M12 4V2" />
+    <path d="M8 5L7 3" />
+    <path d="M16 5l1-2" />
+  </svg>
+);
 
 interface MainContentProps {
   videos: Video[];
@@ -253,24 +267,30 @@ const MainContent: React.FC<MainContentProps> = ({
             <button 
               onClick={onTurboCache}
               className="relative group transition-all active:scale-75"
-              aria-label="Turbo Cache Orb"
+              aria-label="Turbo Cache Lion"
             >
-               <div className={`absolute -inset-3 rounded-full blur-xl transition-all duration-1000 opacity-70 ${
+               <div className={`absolute -inset-4 rounded-full blur-2xl transition-all duration-1000 opacity-60 ${
                  cacheStatus === 'done' ? 'bg-green-500 shadow-[0_0_40px_#22c55e]' :
-                 cacheStatus === 'caching' ? 'bg-amber-400 animate-pulse shadow-[0_0_50px_#facc15]' :
+                 cacheStatus === 'caching' ? 'bg-yellow-400 animate-pulse shadow-[0_0_50px_#facc15]' :
                  'bg-red-600 shadow-[0_0_25px_#dc2626]'
                }`}></div>
 
-               <div className={`relative w-9 h-9 rounded-full border-2 transition-all duration-700 flex items-center justify-center shadow-inner ${
-                 cacheStatus === 'done' ? 'bg-green-600 border-green-300' :
-                 cacheStatus === 'caching' ? 'bg-amber-500 border-amber-200 animate-bounce' :
-                 'bg-red-700 border-red-400'
+               <div className={`relative w-12 h-12 rounded-2xl border-2 transition-all duration-700 flex items-center justify-center shadow-2xl backdrop-blur-md overflow-hidden ${
+                 cacheStatus === 'done' ? 'bg-green-950/80 border-green-400' :
+                 cacheStatus === 'caching' ? 'bg-yellow-950/80 border-yellow-400 animate-bounce' :
+                 'bg-red-950/80 border-red-500'
                }`}>
-                  <div className={`w-3.5 h-3.5 rounded-full blur-[0.5px] ${
-                    cacheStatus === 'done' ? 'bg-green-100' :
-                    cacheStatus === 'caching' ? 'bg-white' :
-                    'bg-red-200'
-                  }`}></div>
+                  <div className={`transition-colors duration-500 ${
+                    cacheStatus === 'done' ? 'text-green-400' :
+                    cacheStatus === 'caching' ? 'text-yellow-400' :
+                    'text-red-500'
+                  }`}>
+                    <LionIcon color="currentColor" />
+                  </div>
+               </div>
+               
+               <div className={`absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-[6px] font-black uppercase tracking-widest transition-opacity duration-500 ${cacheStatus === 'idle' ? 'opacity-40' : 'opacity-100'}`}>
+                 {cacheStatus === 'done' ? 'Memory Locked' : cacheStatus === 'caching' ? 'Devouring Data' : 'Wake the Beast'}
                </div>
             </button>
           </div>
