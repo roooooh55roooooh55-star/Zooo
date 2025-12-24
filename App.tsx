@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Video, AppView, UserInteractions } from './types.ts';
 import { fetchCloudinaryVideos } from './cloudinaryClient.ts';
@@ -13,6 +14,8 @@ import HiddenVideosPage from './components/HiddenVideosPage.tsx';
 import AIOracle from './components/AIOracle.tsx';
 import AdminDashboard from './components/AdminDashboard.tsx';
 
+const DEFAULT_CATEGORIES = ['رعب حقيقي', 'قصص رعب', 'غموض', 'ما وراء الطبيعة', 'أرشيف المطور'];
+
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.HOME);
   const [rawVideos, setRawVideos] = useState<Video[]>([]); 
@@ -20,6 +23,11 @@ const App: React.FC = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0); 
   const [selectedShort, setSelectedShort] = useState<{ video: Video, list: Video[] } | null>(null);
   const [selectedLong, setSelectedLong] = useState<{ video: Video, list: Video[] } | null>(null);
+
+  const [categories, setCategories] = useState<string[]>(() => {
+    const saved = localStorage.getItem('al-hadiqa-categories');
+    return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES;
+  });
 
   const [adminPassword, setAdminPassword] = useState(() => {
     try {
@@ -48,10 +56,12 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
-    try {
-      localStorage.setItem('al-hadiqa-interactions', JSON.stringify(interactions));
-    } catch (e) {}
+    localStorage.setItem('al-hadiqa-interactions', JSON.stringify(interactions));
   }, [interactions]);
+
+  useEffect(() => {
+    localStorage.setItem('al-hadiqa-categories', JSON.stringify(categories));
+  }, [categories]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -112,16 +122,22 @@ const App: React.FC = () => {
   }, [rawVideos, interactions.dislikedIds]);
 
   const renderContent = () => {
-    // الأولوية لعرض الصفحات التي لا تعتمد على وجود فيديوهات
     if (currentView === AppView.ADMIN) {
-      return <AdminDashboard onClose={() => setCurrentView(AppView.HOME)} currentPassword={adminPassword} onUpdatePassword={updateAdminPassword} />;
+      return (
+        <AdminDashboard 
+          onClose={() => setCurrentView(AppView.HOME)} 
+          currentPassword={adminPassword} 
+          onUpdatePassword={updateAdminPassword}
+          categories={categories}
+          onUpdateCategories={setCategories}
+        />
+      );
     }
     
     if (currentView === AppView.PRIVACY) {
       return <PrivacyPage onOpenAdmin={() => setIsAuthModalOpen(true)} />;
     }
 
-    // ثم التحقق من حالة التحميل للصفحات الأخرى
     if (loading && rawVideos.length === 0) return (
       <div className="flex flex-col items-center justify-center p-20 min-h-[60vh]">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin shadow-[0_0_25px_red]"></div>
@@ -129,8 +145,6 @@ const App: React.FC = () => {
       </div>
     );
 
-    // حالة عدم وجود بيانات (تظهر فقط في الأقسام التي تتطلب فيديوهات)
-    // Fix: Removed redundant currentView !== AppView.PRIVACY and currentView !== AppView.ADMIN checks as they are already handled by early returns above.
     if (rawVideos.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center p-20 text-center gap-6 min-h-[50vh]">
@@ -162,6 +176,7 @@ const App: React.FC = () => {
           <MainContent 
             key={refreshTrigger} 
             videos={homeVideos} 
+            categoriesList={categories}
             interactions={interactions}
             onPlayShort={(v, l) => setSelectedShort({video:v, list:l})}
             onPlayLong={(v, l) => setSelectedLong({video:v, list:l})}

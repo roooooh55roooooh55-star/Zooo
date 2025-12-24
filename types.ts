@@ -8,9 +8,9 @@ export interface Video {
   likes: number;
   views: number;
   title: string;
-  category: 'رعب حقيقي' | 'قصص رعب' | 'غموض' | 'ما وراء الطبيعة' | 'أرشيف المطور';
+  category: string; // تم جعلها سلسلة نصية عامة لدعم التصنيفات المخصصة
   created_at?: string;
-  public_id: string; // للحذف والتعديل في Cloudinary
+  public_id: string;
 }
 
 export interface UserInteractions {

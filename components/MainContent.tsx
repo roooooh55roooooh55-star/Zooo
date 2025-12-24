@@ -62,6 +62,7 @@ const DraggableMarquee: React.FC<{ videos: Video[], interactions: UserInteractio
 
 interface MainContentProps {
   videos: Video[];
+  categoriesList: string[];
   interactions: UserInteractions;
   onPlayShort: (v: Video, list: Video[]) => void;
   onPlayLong: (v: Video, list: Video[], autoNext?: boolean) => void;
@@ -72,22 +73,20 @@ interface MainContentProps {
   loading: boolean;
 }
 
-const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayShort, onPlayLong, onViewUnwatched, onResetHistory, onTurboCache, cacheStatus, loading }) => {
+const MainContent: React.FC<MainContentProps> = ({ videos, categoriesList, interactions, onPlayShort, onPlayLong, onViewUnwatched, onResetHistory, onTurboCache, cacheStatus, loading }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const safeVideos = Array.isArray(videos) ? videos : [];
 
-  const categories: Record<string, Video[]> = useMemo(() => {
+  const categoriesData: Record<string, Video[]> = useMemo(() => {
     const filtered = !searchQuery ? safeVideos : safeVideos.filter(v => v.title.toLowerCase().includes(searchQuery.toLowerCase()) || v.category.includes(searchQuery));
-    return {
-      'رعب حقيقي': filtered.filter(v => v.category === 'رعب حقيقي'),
-      'قصص رعب': filtered.filter(v => v.category === 'قصص رعب'),
-      'غموض': filtered.filter(v => v.category === 'غموض'),
-      'ما وراء الطبيعة': filtered.filter(v => v.category === 'ما وراء الطبيعة'),
-      'أرشيف المطور': filtered.filter(v => v.category === 'أرشيف المطور'),
-    };
-  }, [safeVideos, searchQuery]);
+    const result: Record<string, Video[]> = {};
+    categoriesList.forEach(cat => {
+        result[cat] = filtered.filter(v => v.category === cat);
+    });
+    return result;
+  }, [safeVideos, searchQuery, categoriesList]);
 
   const unwatchedHistoryMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -126,9 +125,6 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
               </button>
             )}
-            <button onClick={onTurboCache} className="w-10 h-10 rounded-full bg-red-600/10 flex items-center justify-center border border-red-600/20 active:scale-90 transition-all">
-               <img src={LOGO_URL} className="w-6 h-6 rounded-full opacity-60 hover:opacity-100" />
-            </button>
           </div>
         </div>
       </section>
@@ -146,7 +142,7 @@ const MainContent: React.FC<MainContentProps> = ({ videos, interactions, onPlayS
         </section>
       )}
 
-      {Object.entries(categories).map(([name, list]) => (
+      {Object.entries(categoriesData).map(([name, list]) => (
         list.length > 0 && (
           <section key={name}>
             <div className="flex items-center gap-3 mb-4 px-1">

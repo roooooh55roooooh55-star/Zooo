@@ -9,7 +9,7 @@ const PROXY = 'https://api.allorigins.win/raw?url=';
 const getAuthHeader = () => {
   try {
     const credentials = `${API_KEY}:${API_SECRET}`;
-    return btoa(credentials);
+    return `Basic ${btoa(credentials)}`;
   } catch (e) {
     return '';
   }
@@ -18,33 +18,55 @@ const getAuthHeader = () => {
 export const fetchCloudinaryVideos = async (): Promise<Video[]> => {
   try {
     const timestamp = new Date().getTime();
-    // استخدام Search API لاسترجاع أدق للمحتوى المرفوع حديثاً
-    const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/search?expression=resource_type:video&with_field=context&with_field=tags&max_results=500&sort_by=created_at:desc&t=${timestamp}`;
+    // التغيير لـ resources endpoint لأنه أكثر توافقاً مع طلبات CORS البروكسي
+    const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/video?max_results=500&context=true&tags=true&t=${timestamp}`;
     
     const response = await fetch(
       `${PROXY}${encodeURIComponent(targetUrl)}`,
       { 
         method: 'GET',
         headers: { 
-          'Authorization': `Basic ${getAuthHeader()}`,
+          'Authorization': getAuthHeader(),
           'Accept': 'application/json'
         }
       }
     );
     
-    if (!response.ok) throw new Error(`Status: ${response.status}`);
+    if (!response.ok) {
+        // محاولة بديلة عبر Search API في حال فشل الـ resources
+        return await fetchViaSearch();
+    }
     
     const data = await response.json();
     const resources = data.resources || [];
+    return mapCloudinaryData(resources);
+  } catch (error) {
+    console.error('Fetch Error, attempting fallback:', error);
+    return await fetchViaSearch();
+  }
+};
 
+const fetchViaSearch = async (): Promise<Video[]> => {
+    try {
+        const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/search?expression=resource_type:video&with_field=context&with_field=tags&max_results=500`;
+        const response = await fetch(`${PROXY}${encodeURIComponent(targetUrl)}`, {
+            method: 'GET',
+            headers: { 'Authorization': getAuthHeader() }
+        });
+        const data = await response.json();
+        return mapCloudinaryData(data.resources || []);
+    } catch (e) {
+        return [];
+    }
+}
+
+const mapCloudinaryData = (resources: any[]): Video[] => {
     return resources.map((res: any) => {
       const videoType: 'short' | 'long' = (res.height > res.width) ? 'short' : 'long';
       const optimizedUrl = res.secure_url.replace('/upload/', '/upload/q_auto,f_auto/');
       
-      const categories = ['رعب حقيقي', 'قصص رعب', 'غموض', 'ما وراء الطبيعة', 'أرشيف المطور'];
-      const categoryTag = res.tags?.find((t: string) => categories.includes(t)) || 'غموض';
-      
-      const caption = res.context?.caption || 
+      const categoryTag = res.tags?.[0] || 'غموض';
+      const caption = res.context?.custom?.caption || res.context?.caption || 
                       res.public_id.split('/').pop()?.replace(/_/g, ' ') || 
                       'فيديو مرعب';
 
@@ -60,11 +82,7 @@ export const fetchCloudinaryVideos = async (): Promise<Video[]> => {
         created_at: res.created_at
       } as Video;
     });
-  } catch (error) {
-    console.error('Fetch Error:', error);
-    return [];
-  }
-};
+}
 
 export const deleteCloudinaryVideo = async (publicId: string) => {
   try {
@@ -73,10 +91,7 @@ export const deleteCloudinaryVideo = async (publicId: string) => {
       `${PROXY}${encodeURIComponent(targetUrl)}`,
       {
         method: 'DELETE',
-        headers: { 
-          'Authorization': `Basic ${getAuthHeader()}`,
-          'Accept': 'application/json'
-        }
+        headers: { 'Authorization': getAuthHeader() }
       }
     );
     return response.ok;
@@ -89,25 +104,25 @@ export const updateCloudinaryMetadata = async (publicId: string, title: string, 
   try {
     const contextUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/context`;
     const contextParams = new URLSearchParams();
-    contextParams.append('context', `caption=${title}`);
-    contextParams.append('public_ids', publicId);
-    contextParams.append('command', 'add');
+    contextParams.set('context', `caption=${title}`);
+    contextParams.set('public_ids', publicId);
+    contextParams.set('command', 'add');
 
     await fetch(`${PROXY}${encodeURIComponent(contextUrl)}`, {
       method: 'POST',
-      headers: { 'Authorization': `Basic ${getAuthHeader()}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 'Authorization': getAuthHeader(), 'Content-Type': 'application/x-www-form-urlencoded' },
       body: contextParams
     });
 
     const tagUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/tags`;
     const tagParams = new URLSearchParams();
-    tagParams.append('tags', category);
-    tagParams.append('public_ids', publicId);
-    tagParams.append('command', 'replace');
+    tagParams.set('tags', category);
+    tagParams.set('public_ids', publicId);
+    tagParams.set('command', 'replace');
 
     await fetch(`${PROXY}${encodeURIComponent(tagUrl)}`, {
       method: 'POST',
-      headers: { 'Authorization': `Basic ${getAuthHeader()}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 'Authorization': getAuthHeader(), 'Content-Type': 'application/x-www-form-urlencoded' },
       body: tagParams
     });
 
