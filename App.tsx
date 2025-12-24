@@ -13,19 +13,17 @@ import PrivacyPage from './components/PrivacyPage.tsx';
 import HiddenVideosPage from './components/HiddenVideosPage.tsx';
 import AIOracle from './components/AIOracle.tsx';
 
-// دالة متقدمة لحفظ الفيديو في الذاكرة الداخلية للمتصفح
-const cacheVideo = async (url: string) => {
+const cacheVideoContent = async (url: string) => {
   try {
-    const cache = await caches.open('al-hadiqa-videos-v1');
-    const response = await cache.match(url);
-    if (!response) {
-      // تحميل الفيديو وحفظه في الكاش إذا لم يكن موجوداً
-      await cache.add(url);
-      console.log(`Video cached: ${url}`);
+    const cache = await caches.open('hadiqa-turbo-v2');
+    const cachedResponse = await cache.match(url);
+    if (!cachedResponse) {
+      const response = await fetch(url);
+      if (response.ok) {
+        await cache.put(url, response.clone());
+      }
     }
-  } catch (e) {
-    console.error("Caching failed", e);
-  }
+  } catch (e) {}
 };
 
 const shuffleArray = (array: any[]) => {
@@ -45,7 +43,7 @@ const App: React.FC = () => {
   const [selectedShort, setSelectedShort] = useState<{ video: Video, list: Video[] } | null>(null);
   const [selectedLong, setSelectedLong] = useState<{ video: Video, list: Video[], autoNext: boolean } | null>(null);
   
-  const [sessionNonce, setSessionNonce] = useState(0); 
+  const [sessionNonce, setSessionNonce] = useState(() => Math.random()); 
   const [pullDistance, setPullDistance] = useState(0);
   const touchStart = useRef<number>(0);
 
@@ -61,20 +59,20 @@ const App: React.FC = () => {
   const loadData = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     try {
-      const data = await fetchVideos(undefined, 400); // زيادة الكمية لضمان تنوع المستودع
+      const data = await fetchVideos(undefined, 500); 
       if (data && data.length > 0) {
         setRawVideos(prev => {
           const prevIds = new Set(prev.map(v => v.id || v.video_url));
           const newOnes = data.filter(v => !prevIds.has(v.id || v.video_url));
           
-          // بدء تخزين الفيديوهات الجديدة في الكاش فوراً
-          newOnes.slice(0, 20).forEach(v => cacheVideo(v.video_url));
+          const pool = [...newOnes, ...prev];
+          pool.slice(0, 40).forEach(v => cacheVideoContent(v.video_url));
           
-          return [...newOnes, ...prev]; 
+          return pool; 
         });
       }
     } catch (err) {
-      console.error("Fetch Error:", err);
+      console.error("Sync Error:", err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -82,21 +80,23 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // تحديث المستودع بشكل مستمر كل 15 ثانية لجلب أي فيديوهات جديدة تضاف للقاعدة
   useEffect(() => {
     loadData();
-    const interval = setInterval(() => loadData(true), 15000);
+    const interval = setInterval(() => loadData(true), 20000);
     return () => clearInterval(interval);
   }, [loadData]);
 
+  // منطق اختيار الفيديوهات للواجهة: استبعاد المشاهد بالكامل، وعمل خلط عشوائي لكل جلسة
   const homeVideos = useMemo(() => {
     const filtered = rawVideos.filter(v => {
       const vidId = v.id || v.video_url;
       const isDisliked = interactions.dislikedIds.includes(vidId);
-      const isSeenFull = interactions.watchHistory.some(h => h.id === vidId && h.progress > 0.98);
+      const isSeenFull = interactions.watchHistory.some(h => h.id === vidId && h.progress > 0.95);
       return !isDisliked && !isSeenFull;
     });
-    return sessionNonce > 0 ? shuffleArray(filtered) : filtered;
+    
+    // خلط الفيديوهات المتاحة لضمان ظهور محتوى "جديد" أو "مختلف" عند كل فتح للتطبيق
+    return shuffleArray(filtered);
   }, [rawVideos, interactions, sessionNonce]);
 
   const handleToggleLike = async (id: string) => {
@@ -123,7 +123,7 @@ const App: React.FC = () => {
       case AppView.TREND:
         return <TrendPage onPlayShort={(v, list) => setSelectedShort({ video: v, list })} onPlayLong={(v) => setSelectedLong({ video: v, list: rawVideos.filter(vid => vid.type === 'long'), autoNext: true })} excludedIds={interactions.dislikedIds} />;
       case AppView.SAVED:
-        return <SavedPage savedIds={interactions.savedIds} allVideos={rawVideos} onPlayShort={(v, list) => setSelectedShort({ video: v, list })} onPlayLong={(v) => setSelectedLong({ video: v, list: rawVideos.filter(vid => interactions.savedIds.includes(vid.id || vid.video_url)), autoNext: true })} />;
+        return <SavedPage savedIds={interactions.savedIds} allVideos={rawVideos} onPlayShort={(v, list) => setSelectedShort({ video: v, list })} onPlayLong={(v) => setSelectedLong({ video: v, list: rawVideos.filter(vid => interactions.savedIds.includes(vid.id || vid.video_url)), autoNext: true })} title="المحفوظات" />;
       case AppView.LIKES:
         return <SavedPage savedIds={interactions.likedIds} allVideos={rawVideos} onPlayShort={(v, list) => setSelectedShort({ video: v, list })} onPlayLong={(v) => setSelectedLong({ video: v, list: rawVideos.filter(vid => interactions.likedIds.includes(vid.id || vid.video_url)), autoNext: true })} title="الإعجابات" />;
       case AppView.UNWATCHED:
@@ -148,7 +148,7 @@ const App: React.FC = () => {
 
   return (
     <div 
-      className="min-h-screen pb-20 max-w-md mx-auto relative bg-[#0f0f0f]"
+      className="min-h-screen pb-20 max-w-md mx-auto relative bg-[#050505]"
       onTouchStart={(e) => { if (window.scrollY === 0) touchStart.current = e.touches[0].clientY; }}
       onTouchMove={(e) => {
         if (window.scrollY === 0 && touchStart.current > 0) {
@@ -159,16 +159,16 @@ const App: React.FC = () => {
       onTouchEnd={() => {
         if (pullDistance > 60) {
           setRefreshing(true);
-          setSessionNonce(prev => prev + 1);
+          setSessionNonce(Math.random());
           loadData();
         } else setPullDistance(0);
         touchStart.current = 0;
       }}
     >
-      <AppBar onViewChange={setCurrentView} onRefresh={() => { setSessionNonce(n => n+1); loadData(); }} currentView={currentView} />
+      <AppBar onViewChange={setCurrentView} onRefresh={() => { setSessionNonce(Math.random()); loadData(); }} currentView={currentView} />
       
-      <div className="fixed left-0 right-0 z-40 flex justify-center transition-all pointer-events-none" style={{ top: `${pullDistance + 10}px`, opacity: pullDistance / 60 }}>
-        <div className={`p-2 bg-red-600 rounded-full shadow-lg ${refreshing ? 'animate-spin' : ''}`}>
+      <div className="fixed left-0 right-0 z-[60] flex justify-center transition-all pointer-events-none" style={{ top: `${pullDistance + 10}px`, opacity: pullDistance / 60 }}>
+        <div className={`p-2 bg-red-600 rounded-full shadow-[0_0_20px_red] ${refreshing ? 'animate-spin' : ''}`}>
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
         </div>
       </div>
