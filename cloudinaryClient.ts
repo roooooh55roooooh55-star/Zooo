@@ -1,28 +1,25 @@
 
 import { Video } from './types';
 
-// Trimmed credentials to prevent hidden space or newline issues from copy-pasting
 const CLOUD_NAME = 'dlrvn33p0'.trim();
 const API_KEY = '392293291257757'.trim();
 const API_SECRET = 'UPSWtjj8T4Vj4x6O_oE-0V3f_8c'.trim();
 const UPLOAD_PRESET = 'Good.zooo'.trim();
 
-// Use a reliable CORS proxy prefix
 const PROXY = 'https://corsproxy.io/?';
 
 const getAuthHeader = () => {
   try {
-    // Basic Auth: base64(api_key:api_secret)
     return btoa(`${API_KEY}:${API_SECRET}`);
   } catch (e) {
-    console.error('Error encoding auth header:', e);
     return '';
   }
 };
 
 export const fetchCloudinaryVideos = async (): Promise<Video[]> => {
   try {
-    const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/video?max_results=500&context=true&tags=true`;
+    // نطلب البيانات مع تفاصيل الأبعاد (width, height) لضمان التصنيف الصحيح
+    const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/video?max_results=500&context=true&tags=true&metadata=true`;
     
     const response = await fetch(
       `${PROXY}${encodeURIComponent(targetUrl)}`,
@@ -36,17 +33,18 @@ export const fetchCloudinaryVideos = async (): Promise<Video[]> => {
     );
     
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Cloudinary API Error Details:', errorData);
-      throw new Error(`Cloudinary API Error: ${response.status} ${errorData.error?.message || 'Unauthorized'}`);
+      throw new Error(`Cloudinary Fetch Error: ${response.status}`);
     }
     
     const data = await response.json();
     if (!data.resources) return [];
 
     return data.resources.map((res: any) => {
-      const isPortrait = res.height > res.width;
-      // High speed mobile playback with q_auto,f_auto
+      // تحديد النوع بناءً على الأبعاد: إذا كان الارتفاع أكبر من العرض فهو فيديو قصير (Short)
+      const width = res.width || 0;
+      const height = res.height || 0;
+      const isPortrait = height > width;
+      
       const optimizedUrl = res.secure_url.replace('/upload/', '/upload/q_auto,f_auto/');
       
       const categories = ['رعب حقيقي', 'قصص رعب', 'غموض', 'ما وراء الطبيعة', 'أرشيف المطور'];
@@ -65,7 +63,7 @@ export const fetchCloudinaryVideos = async (): Promise<Video[]> => {
       } as Video;
     });
   } catch (error) {
-    console.error('Cloudinary Fetch Error:', error);
+    console.error('Cloudinary Sync Failed:', error);
     return [];
   }
 };
@@ -85,14 +83,12 @@ export const deleteCloudinaryVideo = async (publicId: string) => {
     );
     return response.ok;
   } catch (error) {
-    console.error('Delete Error:', error);
     return false;
   }
 };
 
 export const updateCloudinaryMetadata = async (publicId: string, title: string, category: string) => {
   try {
-    // 1. Update Context (Title/Caption)
     const contextUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/context`;
     const contextParams = new URLSearchParams();
     contextParams.append('context', `caption=${title}`);
@@ -108,7 +104,6 @@ export const updateCloudinaryMetadata = async (publicId: string, title: string, 
       body: contextParams
     });
 
-    // 2. Update Tags (Category)
     const tagUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/tags`;
     const tagParams = new URLSearchParams();
     tagParams.append('tags', category);
@@ -126,7 +121,6 @@ export const updateCloudinaryMetadata = async (publicId: string, title: string, 
 
     return contextRes.ok && tagRes.ok;
   } catch (error) {
-    console.error('Update Error:', error);
     return false;
   }
 };

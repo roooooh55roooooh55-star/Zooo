@@ -17,8 +17,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
   const [newPassInput, setNewPassInput] = useState(currentPassword);
   const [showPassSettings, setShowPassSettings] = useState(false);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
-  // حقول الرفع المسبق
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadCategory, setUploadCategory] = useState(CATEGORIES[0]);
 
@@ -32,14 +32,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
   useEffect(() => { loadVideos(); }, []);
 
   const handleDelete = async (pid: string) => {
-    if (window.confirm('هل أنت متأكد من حذف هذا الفيديو نهائياً من Cloudinary؟')) {
+    if (window.confirm('هل أنت متأكد من حذف هذا الفيديو نهائياً؟')) {
       setIsProcessing(pid);
       const ok = await deleteCloudinaryVideo(pid);
       if (ok) {
-        alert('تم الحذف بنجاح');
         loadVideos();
       } else {
-        alert('فشل الحذف. تأكد من اتصال الإنترنت أو البروكسي.');
+        alert('حدث خطأ أثناء الحذف.');
       }
       setIsProcessing(null);
     }
@@ -47,10 +46,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
 
   const handleUpdate = async (v: Video, newTitle: string, newCategory: any) => {
     setIsProcessing(v.public_id);
-    const ok = await updateCloudinaryMetadata(v.public_id, newTitle, newCategory);
-    if (ok) {
-      console.log('Metadata updated');
-    }
+    await updateCloudinaryMetadata(v.public_id, newTitle, newCategory);
     setIsProcessing(null);
   };
 
@@ -60,21 +56,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
       return;
     }
     onUpdatePassword(newPassInput);
-    alert("تم التحديث.");
+    alert("تم تحديث رمز العبور.");
     setShowPassSettings(false);
   };
 
   const openUploadWidget = () => {
     const cloudinary = (window as any).cloudinary;
     if (!cloudinary) {
-      alert("خطأ: مكتبة الرفع لم تتحمل بعد. أعد تحميل الصفحة.");
+      alert("خطأ: مكتبة الرفع لم تتحمل.. يرجى التحقق من اتصال الإنترنت.");
       return;
     }
 
     if (!uploadTitle.trim()) {
-      alert("يرجى كتابة عنوان للفيديو قبل الرفع لضمان حفظه بشكل صحيح.");
+      alert("يرجى إدخال عنوان للفيديو أولاً.");
       return;
     }
+
+    setIsUploading(true);
 
     cloudinary.openUploadWidget(
       {
@@ -82,20 +80,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
         uploadPreset: 'Good.zooo',
         sources: ['local', 'url', 'camera'],
         resourceType: 'video',
-        clientAllowedFormats: ['mp4', 'mov', 'avi'],
-        // تمرير البيانات مباشرة أثناء الرفع لتجنب أخطاء البروكسي لاحقاً
+        clientAllowedFormats: ['mp4', 'mov', 'avi', 'mkv'],
         context: { caption: uploadTitle },
         tags: [uploadCategory],
-        maxFiles: 1
+        maxFiles: 1,
+        styles: {
+          palette: {
+            window: "#050505",
+            sourceBg: "#0A0A0A",
+            windowBorder: "#FF0000",
+            tabIcon: "#FF0000",
+            inactiveTabIcon: "#555555",
+            menuIcons: "#FF0000",
+            link: "#FF0000",
+            action: "#FF0000",
+            inProgress: "#FF0000",
+            complete: "#22C55E",
+            error: "#EF4444",
+            textDark: "#000000",
+            textLight: "#FFFFFF"
+          }
+        }
       },
       (error: any, result: any) => {
         if (!error && result && result.event === "success") {
-          alert(`تم رفع "${uploadTitle}" بنجاح!`);
-          setUploadTitle(''); // إعادة ضبط الحقل
-          // تأخير بسيط للسماح لـ Cloudinary بتحديث الفهرس
-          setTimeout(loadVideos, 2000);
+          setIsUploading(false);
+          setUploadTitle('');
+          alert("تم الرفع بنجاح! سيتم تحديث القائمة تلقائياً.");
+          setTimeout(loadVideos, 3000); // ننتظر قليلاً لمعالجة الفيديو في السحابة
+        } else if (result && result.event === "close") {
+          setIsUploading(false);
         } else if (error) {
-          console.error("Upload Widget Error:", error);
+          setIsUploading(false);
+          console.error("Upload Error:", error);
+          alert("فشل الرفع: تأكد من حجم الملف ونوعه.");
         }
       }
     );
@@ -124,21 +142,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
               onChange={(e) => setNewPassInput(e.target.value)}
               className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm text-red-500 outline-none"
             />
-            <button onClick={handleUpdatePassword} className="bg-red-600 text-white py-2 rounded-xl text-xs font-black">حفظ الرمز</button>
+            <button onClick={handleUpdatePassword} className="bg-red-600 text-white py-2 rounded-xl text-xs font-black">حفظ الرمز الجديد</button>
           </div>
         )}
       </div>
 
-      {/* واجهة الرفع الجديدة */}
-      <div className="mb-10 bg-red-600/10 p-6 rounded-3xl border border-red-600/20 shadow-[0_0_30px_rgba(220,38,38,0.1)]">
-        <h2 className="text-lg font-bold mb-4 text-white">رفع فيديو جديد</h2>
+      {/* واجهة الرفع المتطورة */}
+      <div className="mb-10 bg-red-600/10 p-6 rounded-3xl border border-red-600/20 shadow-2xl relative overflow-hidden">
+        {isUploading && (
+          <div className="absolute inset-0 bg-black/60 z-10 flex items-center justify-center">
+             <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        )}
+        <h2 className="text-lg font-bold mb-4 text-white">إضافة محتوى جديد</h2>
         
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-col gap-2">
-            <label className="text-[10px] text-gray-400 font-bold">عنوان الفيديو (يظهر للمشاهدين):</label>
+            <label className="text-[10px] text-gray-400 font-bold">اسم الفيديو (سيظهر للجمهور):</label>
             <input 
               type="text"
-              placeholder="مثال: ليلة مرعبة في الغابة"
+              placeholder="مثال: ليلة مرعبة في المقبرة"
               value={uploadTitle}
               onChange={(e) => setUploadTitle(e.target.value)}
               className="bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-red-600 transition-all"
@@ -146,7 +169,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
           </div>
           
           <div className="flex flex-col gap-2">
-            <label className="text-[10px] text-gray-400 font-bold">تصنيف الفيديو:</label>
+            <label className="text-[10px] text-gray-400 font-bold">القسم المناسب:</label>
             <select 
               value={uploadCategory}
               onChange={(e) => setUploadCategory(e.target.value)}
@@ -159,31 +182,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
 
         <button 
           onClick={openUploadWidget}
-          className="w-full py-5 bg-red-600 text-white font-black rounded-2xl shadow-[0_0_20px_red] active:scale-95 transition-all flex items-center justify-center gap-3"
+          disabled={isUploading}
+          className={`w-full py-5 text-white font-black rounded-2xl shadow-[0_0_20px_red] active:scale-95 transition-all flex items-center justify-center gap-3 ${isUploading ? 'bg-gray-800' : 'bg-red-600'}`}
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-          ابدأ الرفع الآن
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+          {isUploading ? 'جاري التحضير...' : 'اختر الفيديو للرفع'}
         </button>
+        <p className="text-[9px] text-center text-gray-500 mt-4 italic font-bold">سيتم تحديد (Shorts أو Long) تلقائياً بناءً على أبعاد الفيديو المختار.</p>
       </div>
 
-      {/* قائمة الفيديوهات */}
+      {/* قائمة الفيديوهات المرفوعة */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">مكتبة الفيديوهات ({videos.length})</h2>
-          <button onClick={loadVideos} className="text-[10px] text-blue-500 border border-blue-500/30 px-2 py-1 rounded-lg">تحديث القائمة ↻</button>
+          <h2 className="text-lg font-bold">المحتوى المنشور ({videos.length})</h2>
+          <button onClick={loadVideos} className="text-[10px] text-blue-500 border border-blue-500/30 px-3 py-1.5 rounded-xl active:bg-blue-500/10">تحديث القائمة ↻</button>
         </div>
         
         {loading ? (
           <div className="py-20 flex flex-col items-center gap-4 text-center">
             <div className="w-8 h-8 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="animate-pulse text-red-500 text-[10px] font-black uppercase">جاري مزامنة السحابة...</p>
+            <p className="animate-pulse text-red-500 text-[10px] font-black uppercase">جاري مزامنة المكتبة...</p>
           </div>
         ) : (
           videos.map(v => (
             <div key={v.id} className={`bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3 transition-all ${isProcessing === v.public_id ? 'opacity-50 pointer-events-none scale-95' : 'opacity-100'}`}>
               <div className="flex items-center gap-4">
-                <div className="w-20 aspect-video bg-black rounded-lg overflow-hidden shrink-0 border border-white/5">
+                <div className="w-20 aspect-video bg-black rounded-lg overflow-hidden shrink-0 border border-white/5 relative">
                   <video src={v.video_url} className="w-full h-full object-cover" />
+                  <div className="absolute top-1 right-1 bg-black/60 px-1 rounded text-[7px] text-white uppercase font-black">{v.type}</div>
                 </div>
                 <div className="flex-grow">
                   <input 
@@ -199,7 +225,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
                     >
                       {CATEGORIES.map(c => <option key={c} value={c} className="bg-black text-white">{c}</option>)}
                     </select>
-                    <span className="text-[8px] text-gray-500">{v.type === 'short' ? 'Short' : 'Long'}</span>
+                    <span className="text-[8px] text-gray-500 font-bold">{v.type === 'short' ? 'فيديو قصير (Vertical)' : 'فيديو طويل (Horizontal)'}</span>
                   </div>
                 </div>
               </div>
@@ -208,7 +234,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
                   onClick={() => handleDelete(v.public_id)}
                   className="px-4 py-1.5 bg-red-900/20 text-red-500 text-[10px] font-bold rounded-lg border border-red-500/20 hover:bg-red-600 hover:text-white transition-all"
                 >
-                  {isProcessing === v.public_id ? 'جاري المسح...' : 'حذف نهائي'}
+                  {isProcessing === v.public_id ? 'جاري الحذف...' : 'حذف نهائي'}
                 </button>
               </div>
             </div>
