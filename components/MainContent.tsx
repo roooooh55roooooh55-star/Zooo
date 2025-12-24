@@ -2,7 +2,6 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { Video, UserInteractions } from '../types.ts';
 
-// خوارزمية الأرقام الضخمة جداً (Viral Stats) لتعزيز جاذبية الفيديوهات
 export const getDeterministicStats = (url: string) => {
   let hash = 0;
   for (let i = 0; i < url.length; i++) hash = url.charCodeAt(i) + ((hash << 5) - hash);
@@ -44,7 +43,6 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
       ([entry]) => {
         setIsVisible(entry.isIntersecting);
         if (entry.isIntersecting) {
-          // الحفاظ على الانترنت: لا يتم تشغيل الفيديو فوراً بل بعد 600ms من التوقف أمامه
           timerRef.current = window.setTimeout(() => {
             setShouldPlay(true);
           }, 600);
@@ -53,7 +51,7 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
           setShouldPlay(false);
         }
       },
-      { threshold: 0.6 } // يجب أن يكون أغلب الفيديو واضحاً لبدء التشغيل
+      { threshold: 0.6 }
     );
     if (videoRef.current) observer.observe(videoRef.current);
     return () => observer.disconnect();
@@ -69,7 +67,6 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
       v.play().catch(() => {});
     } else {
       v.pause();
-      // العودة لأول إطار عند الخروج لتوفير الذاكرة
       if (!isVisible) v.currentTime = 0;
     }
 
@@ -86,7 +83,6 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({ video, onClick, className, 
 
   return (
     <div onClick={onClick} className={`relative overflow-hidden cursor-pointer group bg-neutral-900 border border-white/5 transition-all active:scale-95 duration-500 animate-in fade-in zoom-in-95 ${className}`}>
-      {/* عرض الصورة المصغرة (أول إطار) لتوفير البيانات */}
       <video 
         ref={videoRef} 
         src={video.video_url} 
@@ -235,30 +231,44 @@ const MainContent: React.FC<MainContentProps> = ({
   return (
     <div className="flex flex-col gap-14 pb-4">
       <section>
-        <div className="flex items-center gap-3 mb-6 px-1">
+        {/* الهيدر العلوي - العنوان على اليمين والجوهرة على اليسار */}
+        <div className="flex items-center justify-between mb-6 px-1">
+          {/* اليمين: اللوجو والعنوان */}
           <div onClick={onResetHistory} className="flex items-center gap-3 cursor-pointer group active:scale-95 transition-all">
             <img src="https://i.top4top.io/p_3643ksmii1.jpg" className="w-10 h-10 rounded-full border-2 border-red-600 shadow-[0_0_15px_red] object-cover group-hover:shadow-[0_0_25px_red] transition-shadow" />
             <div className="flex flex-col">
               <h2 className="text-xl font-black text-red-600 italic leading-none group-hover:text-red-500">الحديقة المرعبة</h2>
-              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Tap to Refresh & Sync</span>
+              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Tap to Sync Feed</span>
             </div>
           </div>
           
-          <div className="flex-grow flex justify-start pl-2">
+          {/* اليسار: جوهرة التخزين الذكية */}
+          <div className="flex items-center justify-center pr-2">
             <button 
               onClick={onTurboCache}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[9px] font-black transition-all duration-500 ${
-                cacheStatus === 'done' 
-                  ? 'bg-green-600 border-green-400 text-white shadow-[0_0_15px_rgba(34,197,94,0.6)]' 
-                  : cacheStatus === 'caching'
-                  ? 'bg-yellow-500 border-yellow-400 text-black animate-pulse'
-                  : 'bg-red-600/10 border-red-600/30 text-red-500 hover:bg-red-600 hover:text-white shadow-[0_0_10px_rgba(239,68,68,0.2)]'
-              }`}
+              className="relative group transition-transform active:scale-75"
+              aria-label="Smart Cache"
             >
-              <svg className={`w-3.5 h-3.5 ${cacheStatus === 'caching' ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-                <path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-              </svg>
-              {cacheStatus === 'done' ? 'تم التحميل' : cacheStatus === 'caching' ? 'جاري الحفظ...' : 'تحميل للذاكرة'}
+               {/* الحلقات الخارجية المتوهجة */}
+               <div className={`absolute -inset-2 rounded-full blur-xl transition-all duration-1000 opacity-60 ${
+                 cacheStatus === 'done' ? 'bg-green-500 shadow-[0_0_30px_#22c55e]' :
+                 cacheStatus === 'caching' ? 'bg-yellow-400 animate-pulse shadow-[0_0_40px_#facc15]' :
+                 'bg-red-600 shadow-[0_0_20px_#dc2626]'
+               }`}></div>
+
+               {/* جسم الجوهرة الرئيسي */}
+               <div className={`relative w-8 h-8 rounded-full border-2 transition-all duration-700 flex items-center justify-center shadow-inner ${
+                 cacheStatus === 'done' ? 'bg-green-600 border-green-300' :
+                 cacheStatus === 'caching' ? 'bg-yellow-500 border-yellow-200 animate-bounce' :
+                 'bg-red-700 border-red-400'
+               }`}>
+                  {/* مركز الجوهرة - تفاعل ضوئي داخلي */}
+                  <div className={`w-3 h-3 rounded-full blur-[1px] ${
+                    cacheStatus === 'done' ? 'bg-green-200' :
+                    cacheStatus === 'caching' ? 'bg-white' :
+                    'bg-red-300'
+                  }`}></div>
+               </div>
             </button>
           </div>
         </div>
