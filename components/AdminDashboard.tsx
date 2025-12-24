@@ -48,7 +48,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
       if (ok) {
         loadVideos();
       } else {
-        alert('حدث خطأ في الاتصال.. حاول مرة أخرى.');
+        alert('فشل الاتصال بالسحابة.. يرجى التحقق من الإعدادات.');
       }
       setIsProcessing(null);
     }
@@ -92,18 +92,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
       {
         cloudName: 'dlrvn33p0',
         uploadPreset: 'Good.zooo',
+        folder: 'app_videos', // إجبار الرفع إلى مجلد app_videos
         sources: ['local', 'url'],
         resourceType: 'video',
         context: { caption: uploadTitle },
         tags: [uploadCategory],
         maxFiles: 1,
+        clientAllowedFormats: ["mp4", "mov", "avi"],
         styles: { palette: { window: "#050505", sourceBg: "#050505", windowBorder: "#FF0000", tabIcon: "#FF0000", action: "#FF0000", textLight: "#FFFFFF" } }
       },
       (error: any, result: any) => {
         if (!error && result && result.event === "success") {
           setIsUploading(false);
           
-          // تأكيد الرابط عبر HTTPS
           const secureUrl = result.info.secure_url.replace('http://', 'https://');
 
           const newVideo: Video = {
@@ -117,14 +118,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
               views: 0
           };
 
-          // تحديث المعاينة الفورية
           setLastUploaded(newVideo);
-          
-          // إبلاغ المكون الرئيسي بإضافة الفيديو فوراً
           if (onNewVideo) onNewVideo(newVideo);
-          
           setUploadTitle('');
-          // لا حاجة لانتظار loadVideos هنا لأننا أضفناه محلياً
           setVideos(prev => [newVideo, ...prev]);
         } else if (result && result.event === "close") {
           setIsUploading(false);
@@ -148,11 +144,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
         </button>
       </div>
 
-      {/* معاينة الرفع الأخير - التأكد من عمله قبل العودة للرئيسية */}
+      {/* معاينة الرفع الأخير */}
       {lastUploaded && (
         <div className="mb-10 animate-in zoom-in fade-in duration-500">
            <div className="bg-green-600/10 border-2 border-green-600/50 rounded-[2.5rem] p-6 relative overflow-hidden">
-             <div className="absolute top-0 left-0 bg-green-600 text-white text-[8px] font-black px-4 py-1 rounded-br-2xl uppercase">تم التحميل بنجاح</div>
+             <div className="absolute top-0 left-0 bg-green-600 text-white text-[8px] font-black px-4 py-1 rounded-br-2xl uppercase">تأكيد حالة الروح</div>
              <div className="flex flex-col gap-4">
                 <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black border border-white/10 shadow-2xl">
                     <video src={lastUploaded.video_url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
@@ -161,7 +157,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
                     <h3 className="text-lg font-black text-white">{lastUploaded.title}</h3>
                     <p className="text-[10px] text-gray-500 font-bold italic">التصنيف: {lastUploaded.category}</p>
                 </div>
-                <button onClick={() => setLastUploaded(null)} className="w-full py-3 bg-green-600/20 text-green-500 font-black rounded-xl border border-green-600/30 text-xs">تأكيد الاعتماد</button>
+                <button onClick={() => setLastUploaded(null)} className="w-full py-3 bg-green-600/20 text-green-500 font-black rounded-xl border border-green-600/30 text-xs shadow-[0_0_15px_rgba(34,197,94,0.2)]">اعتماد الرفع</button>
              </div>
            </div>
         </div>
@@ -245,40 +241,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            {videos.map(v => (
-                <div key={v.public_id} className={`bg-[#0a0a0a] border border-white/5 rounded-[2rem] p-5 flex flex-col gap-4 transition-all ${isProcessing === v.public_id ? 'opacity-30 blur-sm' : 'hover:border-red-600/30'}`}>
-                <div className="flex items-center gap-5">
-                    <div className="w-24 aspect-video bg-black rounded-2xl overflow-hidden shrink-0 border border-white/5 shadow-inner">
-                    <video src={v.video_url} className="w-full h-full object-cover" />
+            {videos.length === 0 ? (
+                <div className="p-10 text-center border-2 border-dashed border-white/5 rounded-[2rem]">
+                    <p className="text-gray-600 font-bold">لا يوجد فيديوهات في مجلد app_videos</p>
+                </div>
+            ) : (
+                videos.map(v => (
+                    <div key={v.public_id} className={`bg-[#0a0a0a] border border-white/5 rounded-[2rem] p-5 flex flex-col gap-4 transition-all ${isProcessing === v.public_id ? 'opacity-30 blur-sm' : 'hover:border-red-600/30'}`}>
+                    <div className="flex items-center gap-5">
+                        <div className="w-24 aspect-video bg-black rounded-2xl overflow-hidden shrink-0 border border-white/5 shadow-inner">
+                        <video src={v.video_url} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-grow flex flex-col gap-2">
+                        <input 
+                            className="bg-transparent border-b border-white/5 w-full text-sm font-black text-white focus:border-red-600 outline-none pb-1"
+                            defaultValue={v.title}
+                            onBlur={(e) => handleUpdate(v, e.target.value, v.category)}
+                        />
+                        <div className="flex items-center justify-between">
+                            <select 
+                                className="bg-black text-[10px] text-red-500 font-bold outline-none rounded-lg px-2 py-1 border border-white/5"
+                                defaultValue={v.category}
+                                onChange={(e) => handleUpdate(v, v.title, e.target.value)}
+                            >
+                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <span className="text-[8px] text-gray-600 font-black uppercase">{v.type}</span>
+                        </div>
+                        </div>
                     </div>
-                    <div className="flex-grow flex flex-col gap-2">
-                    <input 
-                        className="bg-transparent border-b border-white/5 w-full text-sm font-black text-white focus:border-red-600 outline-none pb-1"
-                        defaultValue={v.title}
-                        onBlur={(e) => handleUpdate(v, e.target.value, v.category)}
-                    />
-                    <div className="flex items-center justify-between">
-                        <select 
-                            className="bg-black text-[10px] text-red-500 font-bold outline-none rounded-lg px-2 py-1 border border-white/5"
-                            defaultValue={v.category}
-                            onChange={(e) => handleUpdate(v, v.title, e.target.value)}
+                    <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
+                        <button 
+                        onClick={() => handleDelete(v.public_id)}
+                        className="px-6 py-2 bg-red-600/10 text-red-500 text-[10px] font-black rounded-xl border border-red-600/20 active:scale-95 transition-all"
                         >
-                            {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                        <span className="text-[8px] text-gray-600 font-black uppercase">{v.type}</span>
+                        حذف من السحابة
+                        </button>
                     </div>
                     </div>
-                </div>
-                <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
-                    <button 
-                    onClick={() => handleDelete(v.public_id)}
-                    className="px-6 py-2 bg-red-600/10 text-red-500 text-[10px] font-black rounded-xl border border-red-600/20 active:scale-95 transition-all"
-                    >
-                    حذف من السحابة
-                    </button>
-                </div>
-                </div>
-            ))}
+                ))
+            )}
           </div>
         )}
       </div>

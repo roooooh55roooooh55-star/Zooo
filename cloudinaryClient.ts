@@ -5,11 +5,12 @@ const CLOUD_NAME = 'dlrvn33p0'.trim();
 const API_KEY = '392293291257757'.trim();
 const API_SECRET = 'UPSWtjj8T4Vj4x6O_oE-0V3f_8c'.trim();
 
-// استخدام بروكسي corsproxy.io يدعم طلبات POST و HTTPS بشكل مستقر
+// استخدام بروكسي موثوق يدعم HTTPS و CORS بشكل كامل
 const PROXY_URL = 'https://corsproxy.io/?';
 
 const getAuthHeader = () => {
   try {
+    // تشفير المفاتيح بنظام Base64 للمصادقة
     const credentials = btoa(`${API_KEY}:${API_SECRET}`);
     return `Basic ${credentials}`;
   } catch (e) {
@@ -19,40 +20,34 @@ const getAuthHeader = () => {
 
 export const fetchCloudinaryVideos = async (): Promise<Video[]> => {
   try {
-    const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/search`;
+    const timestamp = new Date().getTime();
+    // استخدام Resources API مع تحديد المجلد (prefix) لضمان جلب الفيديوهات من app_videos
+    // تم إضافة prefix=app_videos/ لضمان جلب الملفات من المجلد الصحيح
+    const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/video?max_results=500&context=true&tags=true&prefix=app_videos/&t=${timestamp}`;
     
-    // إعداد جسم الطلب لـ Search API لضمان جلب أدق النتائج
-    const searchBody = {
-      expression: 'resource_type:video',
-      with_field: ['context', 'tags', 'metadata'],
-      max_results: 500,
-      sort_by: [{ created_at: 'desc' }]
-    };
-
     const response = await fetch(`${PROXY_URL}${encodeURIComponent(targetUrl)}`, {
-      method: 'POST',
-      mode: 'cors',
+      method: 'GET',
+      mode: 'cors', // تفعيل نمط CORS لتجنب حظر المتصفح
       headers: {
         'Authorization': getAuthHeader(),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(searchBody)
+        'Accept': 'application/json',
+      }
     });
 
     if (!response.ok) {
-      console.warn('Search API failed, trying Resources API fallback...');
-      return await fetchFallbackResources();
+      // إذا فشل جلب المجلد، نحاول جلب كافة الفيديوهات كخطة بديلة
+      return await fetchAllVideosFallback();
     }
 
     const data = await response.json();
     return mapCloudinaryData(data.resources || []);
   } catch (error) {
     console.error('Fetch Error:', error);
-    return await fetchFallbackResources();
+    return await fetchAllVideosFallback();
   }
 };
 
-const fetchFallbackResources = async (): Promise<Video[]> => {
+const fetchAllVideosFallback = async (): Promise<Video[]> => {
   try {
     const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/video?max_results=500&context=true&tags=true`;
     const response = await fetch(`${PROXY_URL}${encodeURIComponent(targetUrl)}`, {
@@ -63,8 +58,6 @@ const fetchFallbackResources = async (): Promise<Video[]> => {
     const data = await response.json();
     return mapCloudinaryData(data.resources || []);
   } catch (e) {
-    console.error('Fallback Fetch Error:', e);
-    // استرجاع الفيديوهات من التخزين المحلي في حال الفشل التام
     const cached = localStorage.getItem('app_videos_cache');
     return cached ? JSON.parse(cached) : [];
   }
@@ -73,8 +66,11 @@ const fetchFallbackResources = async (): Promise<Video[]> => {
 const mapCloudinaryData = (resources: any[]): Video[] => {
   const mapped = resources.map((res: any) => {
     const videoType: 'short' | 'long' = (res.height > res.width) ? 'short' : 'long';
-    // التأكد من أن الرابط يبدأ بـ HTTPS
+    
+    // إجبار الرابط على استخدام HTTPS
     const secureUrl = (res.secure_url || res.url).replace('http://', 'https://');
+    
+    // تحسين الرابط للأداء العالي (Auto Quality & Format)
     const optimizedUrl = secureUrl.replace('/upload/', '/upload/q_auto,f_auto/');
     
     const categoryTag = res.tags?.[0] || 'غموض';
@@ -95,7 +91,6 @@ const mapCloudinaryData = (resources: any[]): Video[] => {
     } as Video;
   });
 
-  // حفظ نسخة في التخزين المحلي للطوارئ
   localStorage.setItem('app_videos_cache', JSON.stringify(mapped));
   return mapped;
 };
@@ -105,6 +100,7 @@ export const deleteCloudinaryVideo = async (publicId: string) => {
     const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/video/upload?public_ids[]=${encodeURIComponent(publicId)}`;
     const response = await fetch(`${PROXY_URL}${encodeURIComponent(targetUrl)}`, {
       method: 'DELETE',
+      mode: 'cors',
       headers: { 'Authorization': getAuthHeader() }
     });
     return response.ok;
@@ -115,16 +111,18 @@ export const deleteCloudinaryVideo = async (publicId: string) => {
 
 export const updateCloudinaryMetadata = async (publicId: string, title: string, category: string) => {
   try {
-    const targetUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/tags`;
-    const params = new URLSearchParams();
-    params.set('tags', category);
-    params.set('public_ids', publicId);
-    params.set('command', 'replace');
+    // تحديث التاغات (Category)
+    const tagUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/tags`;
+    const tagParams = new URLSearchParams();
+    tagParams.set('tags', category);
+    tagParams.set('public_ids', publicId);
+    tagParams.set('command', 'replace');
 
-    await fetch(`${PROXY_URL}${encodeURIComponent(targetUrl)}`, {
+    await fetch(`${PROXY_URL}${encodeURIComponent(tagUrl)}`, {
       method: 'POST',
+      mode: 'cors',
       headers: { 'Authorization': getAuthHeader() },
-      body: params
+      body: tagParams
     });
 
     return true;
