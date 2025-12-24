@@ -67,19 +67,14 @@ const App: React.FC = () => {
     setLoading(true);
     try {
       const data = await fetchCloudinaryVideos();
-      if (Array.isArray(data) && data.length > 0) {
-        setRawVideos(data);
-      } else {
-        // إذا فشل الجلب، نحاول استخدام الكاش المحلي
-        const cached = localStorage.getItem('app_videos_cache');
-        if (cached) setRawVideos(JSON.parse(cached));
-      }
+      setRawVideos(data);
     } catch (err) {
       console.error("Critical Sync Error:", err);
       const cached = localStorage.getItem('app_videos_cache');
       if (cached) setRawVideos(JSON.parse(cached));
     } finally {
-      setTimeout(() => setLoading(false), 500);
+      // إطالة وقت التحميل قليلاً لضمان سلاسة الانتقال
+      setTimeout(() => setLoading(false), 800);
     }
   }, []);
 
@@ -87,10 +82,9 @@ const App: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  // دالة لتحديث الفيديوهات محلياً فور الرفع
   const handleNewVideoUploaded = (newVideo: Video) => {
     setRawVideos(prev => [newVideo, ...prev]);
-    // تحديث الكاش أيضاً
+    // تحديث الكاش الفوري
     const currentCache = JSON.parse(localStorage.getItem('app_videos_cache') || '[]');
     localStorage.setItem('app_videos_cache', JSON.stringify([newVideo, ...currentCache]));
   };
@@ -154,16 +148,18 @@ const App: React.FC = () => {
       return <PrivacyPage onOpenAdmin={() => setIsAuthModalOpen(true)} />;
     }
 
+    // سبينر التحميل المطور
     if (loading && rawVideos.length === 0) return (
       <div className="flex flex-col items-center justify-center p-20 min-h-[60vh] animate-in fade-in duration-500">
         <div className="relative">
-            <div className="w-16 h-16 border-4 border-red-600/20 border-t-red-600 rounded-full animate-spin"></div>
+            <div className="w-16 h-16 border-4 border-red-600/10 border-t-red-600 rounded-full animate-spin"></div>
             <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-8 h-8 bg-red-600 rounded-full animate-pulse opacity-50"></div>
+                <div className="w-8 h-8 bg-red-600/20 rounded-full animate-pulse"></div>
             </div>
         </div>
-        <p className="text-red-500 font-black mt-10 text-[9px] animate-pulse tracking-[0.4em] uppercase text-center">
-            جاري فحص اتصال السحابة...<br/><span className="text-gray-700 text-[7px] mt-2 block">Secure Handshake Protocol</span>
+        <p className="text-red-500 font-black mt-10 text-[10px] animate-pulse tracking-[0.3em] uppercase text-center">
+            جاري استدعاء الأرواح...<br/>
+            <span className="text-gray-700 text-[8px] mt-2 block font-bold">Connecting to app_videos folder</span>
         </p>
       </div>
     );
@@ -174,8 +170,8 @@ const App: React.FC = () => {
           <div className="w-16 h-16 border-2 border-dashed border-red-600/30 rounded-full flex items-center justify-center opacity-50">
              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
           </div>
-          <p className="text-gray-500 font-bold text-sm">لا توجد بيانات.. الأرواح تختبئ.</p>
-          <button onClick={loadData} className="text-red-600 font-black text-xs border border-red-600/30 px-6 py-3 rounded-2xl bg-red-600/5">إعادة المحاولة ↻</button>
+          <p className="text-gray-500 font-bold text-sm">المجلد فارغ أو الاتصال مقطوع.</p>
+          <button onClick={loadData} className="text-red-600 font-black text-xs border border-red-600/30 px-6 py-3 rounded-2xl bg-red-600/5 active:scale-95">تحديث السحابة ↻</button>
         </div>
       );
     }

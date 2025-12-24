@@ -48,7 +48,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
       if (ok) {
         loadVideos();
       } else {
-        alert('فشل الاتصال بالسحابة.. يرجى التحقق من الإعدادات.');
+        alert('حدث خطأ في الاتصال.. يرجى التحقق من لوحة تحكم Cloudinary.');
       }
       setIsProcessing(null);
     }
@@ -79,7 +79,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
   const openUploadWidget = () => {
     const cloudinary = (window as any).cloudinary;
     if (!cloudinary) {
-      alert("النظام السحابي غير مستعد.. انتظر ثوانٍ.");
+      alert("النظام غير مستعد.. انتظر ثوانٍ.");
       return;
     }
     if (!uploadTitle.trim()) {
@@ -92,12 +92,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
       {
         cloudName: 'dlrvn33p0',
         uploadPreset: 'Good.zooo',
-        folder: 'app_videos', // إجبار الرفع إلى مجلد app_videos
+        folder: 'app_videos', // ضمان الرفع لمجلد app_videos
         sources: ['local', 'url'],
         resourceType: 'video',
         context: { caption: uploadTitle },
         tags: [uploadCategory],
         maxFiles: 1,
+        // تفعيل النمط الآمن HTTPS
+        secure: true,
         clientAllowedFormats: ["mp4", "mov", "avi"],
         styles: { palette: { window: "#050505", sourceBg: "#050505", windowBorder: "#FF0000", tabIcon: "#FF0000", action: "#FF0000", textLight: "#FFFFFF" } }
       },
@@ -105,6 +107,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
         if (!error && result && result.event === "success") {
           setIsUploading(false);
           
+          // ضمان استخدام HTTPS في الرابط المرتجع
           const secureUrl = result.info.secure_url.replace('http://', 'https://');
 
           const newVideo: Video = {
@@ -121,6 +124,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
           setLastUploaded(newVideo);
           if (onNewVideo) onNewVideo(newVideo);
           setUploadTitle('');
+          // إضافة الفيديو يدوياً للقائمة الحالية لضمان ظهوره الفوري
           setVideos(prev => [newVideo, ...prev]);
         } else if (result && result.event === "close") {
           setIsUploading(false);
@@ -136,7 +140,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
             <img src={LOGO_URL} className="w-10 h-10 rounded-full border-2 border-red-600 shadow-[0_0_15px_red]" />
             <div className="flex flex-col">
                 <h1 className="text-xl font-black text-red-600 italic leading-tight">بوابة المطور</h1>
-                <span className="text-[8px] text-gray-600 font-bold uppercase tracking-widest">Master Control v4.5</span>
+                <span className="text-[8px] text-gray-600 font-bold uppercase tracking-widest">Cloud Master v4.5</span>
             </div>
         </div>
         <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white/5 rounded-full text-red-500 border border-white/10 active:scale-90">
@@ -147,8 +151,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
       {/* معاينة الرفع الأخير */}
       {lastUploaded && (
         <div className="mb-10 animate-in zoom-in fade-in duration-500">
-           <div className="bg-green-600/10 border-2 border-green-600/50 rounded-[2.5rem] p-6 relative overflow-hidden">
-             <div className="absolute top-0 left-0 bg-green-600 text-white text-[8px] font-black px-4 py-1 rounded-br-2xl uppercase">تأكيد حالة الروح</div>
+           <div className="bg-green-600/10 border-2 border-green-600/50 rounded-[2.5rem] p-6 relative overflow-hidden shadow-[0_0_30px_rgba(34,197,94,0.1)]">
+             <div className="absolute top-0 left-0 bg-green-600 text-white text-[8px] font-black px-4 py-1 rounded-br-2xl uppercase">تم الحفظ في app_videos</div>
              <div className="flex flex-col gap-4">
                 <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black border border-white/10 shadow-2xl">
                     <video src={lastUploaded.video_url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
@@ -157,7 +161,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
                     <h3 className="text-lg font-black text-white">{lastUploaded.title}</h3>
                     <p className="text-[10px] text-gray-500 font-bold italic">التصنيف: {lastUploaded.category}</p>
                 </div>
-                <button onClick={() => setLastUploaded(null)} className="w-full py-3 bg-green-600/20 text-green-500 font-black rounded-xl border border-green-600/30 text-xs shadow-[0_0_15px_rgba(34,197,94,0.2)]">اعتماد الرفع</button>
+                <button onClick={() => setLastUploaded(null)} className="w-full py-3 bg-green-600/20 text-green-500 font-black rounded-xl border border-green-600/30 text-xs shadow-inner">إغلاق المعاينة</button>
              </div>
            </div>
         </div>
@@ -166,7 +170,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
       {/* إدارة القوائم */}
       <div className="mb-8 bg-white/5 p-5 rounded-[2.5rem] border border-white/5">
         <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xs font-black text-gray-400 uppercase tracking-widest">إدارة القوائم الرئيسية</h2>
+            <h2 className="text-xs font-black text-gray-400 uppercase tracking-widest">تكوين القوائم</h2>
             <button onClick={() => setShowCatSettings(!showCatSettings)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-600/10 text-red-500 border border-red-600/20">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
             </button>
@@ -200,7 +204,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
         {isUploading && (
           <div className="absolute inset-0 bg-black/90 z-20 flex flex-col items-center justify-center rounded-[3rem] backdrop-blur-md">
              <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin mb-6"></div>
-             <p className="text-red-500 text-xs font-black tracking-widest animate-pulse">جاري نقل الروح للسحابة...</p>
+             <p className="text-red-500 text-xs font-black tracking-widest animate-pulse">جاري تأمين الرفع لمجلد app_videos...</p>
           </div>
         )}
         <h2 className="text-xl font-black mb-6 text-white italic">إرسال محتوى جديد</h2>
@@ -223,7 +227,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
           onClick={openUploadWidget} disabled={isUploading}
           className="w-full py-6 bg-red-600 text-white font-black rounded-2xl shadow-[0_0_40px_rgba(220,38,38,0.4)] active:scale-95 transition-all text-lg"
         >
-          فتح المعمل السحابي
+          بدء الرفع السحابي
         </button>
       </div>
 
@@ -231,19 +235,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
       <div className="space-y-6">
         <div className="flex items-center justify-between px-2">
             <h2 className="text-xl font-black text-white italic">الأرشيف السحابي <span className="text-red-600">({videos.length})</span></h2>
-            <button onClick={loadVideos} className="text-red-500 text-[10px] font-black tracking-widest uppercase hover:underline">تحديث القائمة ↻</button>
+            <button onClick={loadVideos} className="text-red-500 text-[10px] font-black tracking-widest uppercase hover:underline">تحديث ↻</button>
         </div>
         
         {loading ? (
           <div className="py-20 flex flex-col items-center gap-6">
             <div className="w-10 h-10 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-gray-600 text-[10px] font-black uppercase tracking-widest">مزامنة السجلات...</p>
+            <p className="text-gray-600 text-[10px] font-black uppercase tracking-widest">مزامنة سجلات app_videos...</p>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
             {videos.length === 0 ? (
                 <div className="p-10 text-center border-2 border-dashed border-white/5 rounded-[2rem]">
-                    <p className="text-gray-600 font-bold">لا يوجد فيديوهات في مجلد app_videos</p>
+                    <p className="text-gray-600 font-bold text-xs uppercase tracking-widest">لا توجد بيانات مستردة</p>
                 </div>
             ) : (
                 videos.map(v => (
@@ -275,7 +279,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, currentPasswor
                         onClick={() => handleDelete(v.public_id)}
                         className="px-6 py-2 bg-red-600/10 text-red-500 text-[10px] font-black rounded-xl border border-red-600/20 active:scale-95 transition-all"
                         >
-                        حذف من السحابة
+                        حذف نهائي
                         </button>
                     </div>
                     </div>
