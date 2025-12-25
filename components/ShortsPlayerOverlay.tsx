@@ -28,13 +28,20 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
   useEffect(() => {
     const vid = videoRefs.current[currentIndex];
     if (vid) {
+      // إعطاء الأولوية القصوى للفيديو الحالي
+      vid.preload = "auto";
       vid.play().catch(() => { vid.muted = true; vid.play(); });
     }
     Object.keys(videoRefs.current).forEach((key) => {
       const idx = parseInt(key);
       if (idx !== currentIndex) {
-        videoRefs.current[idx]?.pause();
-        if (videoRefs.current[idx]) videoRefs.current[idx]!.currentTime = 0;
+        const otherVid = videoRefs.current[idx];
+        if (otherVid) {
+          otherVid.pause();
+          otherVid.currentTime = 0;
+          // منع تحميل الفيديوهات الأخرى لتوفير السرعة للفيديو الحالي
+          otherVid.preload = "none";
+        }
       }
     });
   }, [currentIndex]);
@@ -77,13 +84,12 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
                   ref={el => { videoRefs.current[idx] = el; }}
                   src={video.video_url} 
                   className="h-full w-full object-cover"
-                  playsInline loop preload="auto"
+                  playsInline loop preload={idx === currentIndex ? "auto" : "none"}
                   onTimeUpdate={(e) => idx === currentIndex && onProgress(video.id, e.currentTarget.currentTime / e.currentTarget.duration)}
               />
               
               <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80 pointer-events-none" />
 
-              {/* الأزرار الجانبية */}
               <div className="absolute bottom-28 left-6 flex flex-col items-center gap-6 z-40">
                 <button onClick={() => handleAction('like', video.id)} className="flex flex-col items-center group">
                   <div className={`p-4 rounded-full transition-all duration-300 border-2 active:scale-150 ${isLiked ? 'bg-red-600 border-red-400 text-white shadow-[0_0_30px_red]' : 'bg-red-600/10 border-red-600 text-red-600 shadow-[0_0_15px_red]'}`}>
@@ -107,7 +113,6 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
                 </button>
               </div>
 
-              {/* تفاصيل الفيديو */}
               <div className="absolute bottom-32 right-8 left-24 z-40 text-right">
                 <div className="inline-block bg-red-600/40 backdrop-blur-md px-3 py-1 rounded-lg border border-red-600 mb-3">
                   <span className="text-[10px] font-black text-white tracking-widest uppercase">{video.category}</span>

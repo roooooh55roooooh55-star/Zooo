@@ -59,7 +59,7 @@ const App: React.FC = () => {
     setLoading(true);
     try {
       const data = await fetchCloudinaryVideos();
-      // خلط الفيديوهات عشوائياً في كل مرة لضمان التجديد المستمر
+      // خلط عشوائي لضمان التجديد المستمر
       const shuffled = data.sort(() => Math.random() - 0.5);
       const filtered = shuffled.filter(v => !deletedByAdmin.includes(v.id || v.video_url));
       setRawVideos(filtered);
@@ -73,11 +73,10 @@ const App: React.FC = () => {
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleHardReset = useCallback(() => {
-    // إزالة نافذة التأكيد التقليدية والاكتفاء بتنفيذ الأمر مع تنبيه عصري
     setInteractions(prev => ({ ...prev, watchHistory: [] }));
     loadData();
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    showToast("تم تحديث الحديقة بنجاح");
+    showToast("تم تحديث الحديقة ومسح الكاش");
   }, [loadData]);
 
   const updateWatchHistory = (id: string, progress: number) => {
@@ -92,6 +91,8 @@ const App: React.FC = () => {
       return { ...prev, watchHistory: history };
     });
   };
+
+  const isPlayerOpen = !!(selectedShort || selectedLong);
 
   const renderContent = () => {
     if (currentView === AppView.ADMIN) {
@@ -117,7 +118,8 @@ const App: React.FC = () => {
 
     switch (currentView) {
       case AppView.TREND: return <TrendPage onPlayShort={(v, l) => setSelectedShort({video:v, list:l})} onPlayLong={(v) => setSelectedLong({video:v, list:rawVideos})} excludedIds={interactions.dislikedIds} />;
-      case AppView.SAVED: return <SavedPage savedIds={interactions.savedIds} allVideos={rawVideos} onPlayShort={(v, l) => setSelectedShort({video:v, list:l})} onPlayLong={(v) => setSelectedLong({video:v, list:rawVideos})} />;
+      case AppView.LIKES: return <SavedPage title="الإعجابات" savedIds={interactions.likedIds} allVideos={rawVideos} onPlayShort={(v, l) => setSelectedShort({video:v, list:l})} onPlayLong={(v) => setSelectedLong({video:v, list:rawVideos})} />;
+      case AppView.SAVED: return <SavedPage title="المحفوظات" savedIds={interactions.savedIds} allVideos={rawVideos} onPlayShort={(v, l) => setSelectedShort({video:v, list:l})} onPlayLong={(v) => setSelectedLong({video:v, list:rawVideos})} />;
       case AppView.UNWATCHED: return <UnwatchedPage watchHistory={interactions.watchHistory} allVideos={rawVideos} onPlayShort={(v, l) => setSelectedShort({video:v, list:l})} onPlayLong={(v) => setSelectedLong({video:v, list:rawVideos})} />;
       case AppView.PRIVACY: return <PrivacyPage onOpenAdmin={() => setIsAuthModalOpen(true)} />;
       case AppView.HIDDEN: return <HiddenVideosPage interactions={interactions} allVideos={rawVideos} onRestore={(id) => setInteractions(p => ({...p, dislikedIds: p.dislikedIds.filter(x => x !== id)}))} onPlayShort={(v, l) => setSelectedShort({video:v, list:l})} onPlayLong={(v) => setSelectedLong({video:v, list:rawVideos})} />;
@@ -133,6 +135,7 @@ const App: React.FC = () => {
             onHardReset={handleHardReset}
             loading={loading}
             onShowToast={showToast}
+            isGlobalPlayerOpen={isPlayerOpen}
           />
         );
     }
@@ -144,7 +147,6 @@ const App: React.FC = () => {
       <main className="pt-24">{renderContent()}</main>
       <AIOracle />
       
-      {/* Toast Notification System */}
       {toast && (
         <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[1100] bg-red-600/90 backdrop-blur-xl border border-red-400 text-white px-8 py-3 rounded-full font-black text-xs shadow-[0_0_30px_red] animate-in slide-in-from-top-10 duration-500">
           {toast}
