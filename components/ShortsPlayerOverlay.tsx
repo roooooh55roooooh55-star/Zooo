@@ -15,7 +15,7 @@ interface ShortsPlayerOverlayProps {
 }
 
 const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({ 
-  initialVideo, videoList, onClose, onLike, onDislike, onSave, onProgress
+  initialVideo, videoList, interactions, onClose, onLike, onDislike, onSave, onProgress
 }) => {
   const [currentIndex, setCurrentIndex] = useState(() => {
     const idx = videoList.findIndex(v => v.id === initialVideo.id);
@@ -30,7 +30,6 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
     if (vid) {
       vid.play().catch(() => { vid.muted = true; vid.play(); });
     }
-    // إيقاف الآخرين لضمان الأداء
     Object.keys(videoRefs.current).forEach((key) => {
       const idx = parseInt(key);
       if (idx !== currentIndex) {
@@ -53,12 +52,12 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
     if (navigator.vibrate) navigator.vibrate(50);
     setTimeout(() => setActiveAnim(null), 600);
     if (type === 'like') onLike(id);
+    if (type === 'dislike') onDislike(id);
     if (type === 'save') onSave(id);
   };
 
   return (
     <div className="fixed inset-0 bg-black z-[500] flex flex-col overflow-hidden">
-      {/* زر الخروج العلوي */}
       <div className="absolute top-10 left-6 z-[600]">
         <button onClick={onClose} className="p-4 rounded-2xl bg-black/40 backdrop-blur-md text-red-600 border border-red-600 shadow-[0_0_20px_red] active:scale-75 transition-all">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="4"><path d="M6 18L18 6M6 6l12 12"/></svg>
@@ -68,39 +67,43 @@ const ShortsPlayerOverlay: React.FC<ShortsPlayerOverlayProps> = ({
       <div onScroll={handleScroll} className="flex-grow overflow-y-scroll snap-y snap-mandatory scrollbar-hide h-full w-full">
         {videoList.map((video, idx) => {
           const stats = getDeterministicStats(video.video_url);
+          const isLiked = interactions.likedIds.includes(video.id);
+          const isDisliked = interactions.dislikedIds.includes(video.id);
+          const isSaved = interactions.savedIds.includes(video.id);
+
           return (
             <div key={`${video.id}-${idx}`} className="h-full w-full snap-start relative bg-black">
               <video 
                   ref={el => { videoRefs.current[idx] = el; }}
                   src={video.video_url} 
                   className="h-full w-full object-cover"
-                  playsInline loop preload="auto" // تحميل مسبق لضمان الجاهزية
+                  playsInline loop preload="auto"
                   onTimeUpdate={(e) => idx === currentIndex && onProgress(video.id, e.currentTarget.currentTime / e.currentTarget.duration)}
               />
               
               <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80 pointer-events-none" />
 
-              {/* تأثير النقر (لايك) */}
-              {activeAnim === 'like' && idx === currentIndex && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50 animate-ping">
-                  <svg className="w-40 h-40 text-red-600 drop-shadow-[0_0_50px_red]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                </div>
-              )}
-
               {/* الأزرار الجانبية */}
-              <div className="absolute bottom-32 left-8 flex flex-col items-center gap-8 z-40">
+              <div className="absolute bottom-28 left-6 flex flex-col items-center gap-6 z-40">
                 <button onClick={() => handleAction('like', video.id)} className="flex flex-col items-center group">
-                  <div className="p-4 rounded-full bg-red-600/20 border border-red-600 text-red-600 shadow-[0_0_15px_red] group-active:scale-150 transition-all">
-                    <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                  <div className={`p-4 rounded-full transition-all duration-300 border-2 active:scale-150 ${isLiked ? 'bg-red-600 border-red-400 text-white shadow-[0_0_30px_red]' : 'bg-red-600/10 border-red-600 text-red-600 shadow-[0_0_15px_red]'}`}>
+                    <svg className="w-6 h-6" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
                   </div>
-                  <span className="text-[10px] font-black text-white mt-2">{formatBigNumber(stats.likes)}</span>
+                  <span className="text-[10px] font-black text-white mt-1.5">{formatBigNumber(stats.likes)}</span>
+                </button>
+
+                <button onClick={() => handleAction('dislike', video.id)} className="flex flex-col items-center group">
+                  <div className={`p-4 rounded-full transition-all duration-300 border-2 active:scale-150 ${isDisliked ? 'bg-blue-600 border-blue-400 text-white shadow-[0_0_30px_blue]' : 'bg-blue-600/10 border-blue-600 text-blue-600 shadow-[0_0_15px_blue]'}`}>
+                    <svg className="w-6 h-6 rotate-180" fill={isDisliked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
+                  </div>
+                  <span className="text-[10px] font-black text-white mt-1.5 italic">استبعاد</span>
                 </button>
                 
                 <button onClick={() => handleAction('save', video.id)} className="flex flex-col items-center group">
-                   <div className="p-4 rounded-full bg-blue-600/20 border border-blue-600 text-blue-600 shadow-[0_0_15px_blue] group-active:scale-150 transition-all">
-                     <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                   <div className={`p-4 rounded-full transition-all duration-300 border-2 active:scale-150 ${isSaved ? 'bg-yellow-500 border-yellow-300 text-white shadow-[0_0_30px_yellow]' : 'bg-yellow-500/10 border-yellow-500 text-yellow-500 shadow-[0_0_15px_yellow]'}`}>
+                     <svg className="w-6 h-6" fill={isSaved ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
                    </div>
-                   <span className="text-[10px] font-black text-white mt-2">حفظ</span>
+                   <span className="text-[10px] font-black text-white mt-1.5">حفظ</span>
                 </button>
               </div>
 

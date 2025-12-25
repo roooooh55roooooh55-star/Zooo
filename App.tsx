@@ -20,7 +20,6 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.HOME);
   const [rawVideos, setRawVideos] = useState<Video[]>([]); 
   const [loading, setLoading] = useState(true);
-  const [refreshTrigger, setRefreshTrigger] = useState(0); 
   const [selectedShort, setSelectedShort] = useState<{ video: Video, list: Video[] } | null>(null);
   const [selectedLong, setSelectedLong] = useState<{ video: Video, list: Video[] } | null>(null);
 
@@ -54,7 +53,9 @@ const App: React.FC = () => {
     setLoading(true);
     try {
       const data = await fetchCloudinaryVideos();
-      const filtered = data.filter(v => !deletedByAdmin.includes(v.id || v.video_url));
+      // خلط الفيديوهات عشوائياً عند التحميل لضمان التغيير المستمر
+      const shuffled = data.sort(() => Math.random() - 0.5);
+      const filtered = shuffled.filter(v => !deletedByAdmin.includes(v.id || v.video_url));
       setRawVideos(filtered);
     } catch (err) {
       console.error(err);
@@ -64,6 +65,14 @@ const App: React.FC = () => {
   }, [deletedByAdmin]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // وظيفة إعادة التشغيل الكامل ومسح الذاكرة
+  const handleHardReset = useCallback(() => {
+    if (window.confirm("هل تريد إعادة ضبط الحديقة ومسح الذاكرة المؤقتة؟")) {
+      localStorage.clear();
+      window.location.reload();
+    }
+  }, []);
 
   const updateWatchHistory = (id: string, progress: number) => {
     setInteractions(prev => {
@@ -111,6 +120,7 @@ const App: React.FC = () => {
             onPlayShort={(v, l) => setSelectedShort({video:v, list:l})}
             onPlayLong={(v, l) => setSelectedLong({video:v, list:l})}
             onResetHistory={loadData}
+            onHardReset={handleHardReset}
             loading={loading}
           />
         );
@@ -150,9 +160,9 @@ const App: React.FC = () => {
           videoList={selectedShort.list} 
           interactions={interactions}
           onClose={() => setSelectedShort(null)} 
-          onLike={(id) => setInteractions(p => ({...p, likedIds: Array.from(new Set([...p.likedIds, id]))}))} 
-          onDislike={(id) => setInteractions(p => ({...p, dislikedIds: Array.from(new Set([...p.dislikedIds, id]))}))} 
-          onSave={(id) => setInteractions(p => ({...p, savedIds: Array.from(new Set([...p.savedIds, id]))}))} 
+          onLike={(id) => setInteractions(p => ({...p, likedIds: p.likedIds.includes(id) ? p.likedIds.filter(x => x !== id) : [...p.likedIds, id], dislikedIds: p.dislikedIds.filter(x => x !== id)}))} 
+          onDislike={(id) => setInteractions(p => ({...p, dislikedIds: p.dislikedIds.includes(id) ? p.dislikedIds.filter(x => x !== id) : [...p.dislikedIds, id], likedIds: p.likedIds.filter(x => x !== id)}))} 
+          onSave={(id) => setInteractions(p => ({...p, savedIds: p.savedIds.includes(id) ? p.savedIds.filter(x => x !== id) : [...p.savedIds, id]}))} 
           onProgress={updateWatchHistory}
         />
       )}
@@ -162,9 +172,9 @@ const App: React.FC = () => {
           video={selectedLong.video} 
           allLongVideos={selectedLong.list}
           onClose={() => setSelectedLong(null)}
-          onLike={() => setInteractions(p => ({...p, likedIds: Array.from(new Set([...p.likedIds, selectedLong.video.id]))}))}
-          onDislike={() => setInteractions(p => ({...p, dislikedIds: Array.from(new Set([...p.dislikedIds, selectedLong.video.id]))}))}
-          onSave={() => setInteractions(p => ({...p, savedIds: Array.from(new Set([...p.savedIds, selectedLong.video.id]))}))}
+          onLike={() => setInteractions(p => ({...p, likedIds: p.likedIds.includes(selectedLong.video.id) ? p.likedIds.filter(x => x !== selectedLong.video.id) : [...p.likedIds, selectedLong.video.id], dislikedIds: p.dislikedIds.filter(x => x !== selectedLong.video.id)}))}
+          onDislike={() => setInteractions(p => ({...p, dislikedIds: p.dislikedIds.includes(selectedLong.video.id) ? p.dislikedIds.filter(x => x !== selectedLong.video.id) : [...p.dislikedIds, selectedLong.video.id], likedIds: p.likedIds.filter(x => x !== selectedLong.video.id)}))}
+          onSave={() => setInteractions(p => ({...p, savedIds: p.savedIds.includes(selectedLong.video.id) ? p.savedIds.filter(x => x !== selectedLong.video.id) : [...p.savedIds, selectedLong.video.id]}))}
           onSwitchVideo={(v) => setSelectedLong({ video: v, list: selectedLong.list })}
           isLiked={interactions.likedIds.includes(selectedLong.video.id)} 
           isDisliked={interactions.dislikedIds.includes(selectedLong.video.id)} 

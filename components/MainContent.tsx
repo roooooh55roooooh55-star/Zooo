@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Video, UserInteractions } from '../types.ts';
 
 const LOGO_URL = "https://i.top4top.io/p_3643ksmii1.jpg";
@@ -20,6 +20,15 @@ export const formatBigNumber = (num: number) => {
   return num.toString();
 };
 
+const LiveThumbnail: React.FC<{ url: string, isShort?: boolean, className?: string }> = ({ url, isShort, className }) => {
+  return (
+    <video 
+      src={url} muted autoPlay loop playsInline preload="auto"
+      className={`w-full h-full object-cover ${className}`}
+    />
+  );
+};
+
 const InteractiveMarquee: React.FC<{ 
   videos: Video[], 
   onPlay: (v: Video) => void, 
@@ -31,7 +40,7 @@ const InteractiveMarquee: React.FC<{
 
   const displayVideos = useMemo(() => {
     if (!videos || videos.length === 0) return [];
-    return [...videos, ...videos, ...videos]; // تكرار لضمان انسيابية الماركي
+    return [...videos, ...videos, ...videos]; 
   }, [videos]);
 
   if (displayVideos.length === 0) return null;
@@ -58,7 +67,7 @@ const InteractiveMarquee: React.FC<{
           return (
             <div key={`${id}-${i}`} onClick={() => onPlay(video)} className="flex-shrink-0 w-48 active:scale-95 transition-all cursor-pointer group">
               <div className="relative rounded-2xl overflow-hidden border border-red-600/40 bg-black aspect-video shadow-[0_0_15px_rgba(220,38,38,0.2)] group-hover:border-red-600 transition-colors">
-                <video src={video.video_url} muted playsInline preload="metadata" className="w-full h-full object-cover opacity-80" />
+                <LiveThumbnail url={video.video_url} />
                 {progress > 0 && (
                   <div className="absolute bottom-0 left-0 w-full h-1 bg-white/10">
                     <div className="h-full bg-red-600 shadow-[0_0_8px_red]" style={{ width: `${progress * 100}%` }}></div>
@@ -83,14 +92,26 @@ interface MainContentProps {
   onPlayShort: (v: Video, list: Video[]) => void;
   onPlayLong: (v: Video, list: Video[]) => void;
   onResetHistory: () => void;
+  onHardReset?: () => void;
   loading: boolean;
 }
 
 const MainContent: React.FC<MainContentProps> = ({ 
-  videos, categoriesList, interactions, onPlayShort, onPlayLong, onResetHistory, loading 
+  videos, categoriesList, interactions, onPlayShort, onPlayLong, onResetHistory, onHardReset, loading 
 }) => {
-  const shorts = useMemo(() => videos.filter(v => v.type === 'short'), [videos]);
-  const longs = useMemo(() => videos.filter(v => v.type === 'long'), [videos]);
+  const [startY, setStartY] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // تصفية الفيديوهات: إخفاء أي فيديو تم مشاهدة أكثر من 90% منه
+  const filteredVideos = useMemo(() => {
+    const watchedIds = interactions.watchHistory
+      .filter(h => h.progress > 0.9)
+      .map(h => h.id);
+    return videos.filter(v => !watchedIds.includes(v.id || v.video_url));
+  }, [videos, interactions.watchHistory]);
+
+  const shorts = useMemo(() => filteredVideos.filter(v => v.type === 'short'), [filteredVideos]);
+  const longs = useMemo(() => filteredVideos.filter(v => v.type === 'long'), [filteredVideos]);
 
   const unwatchedVideos = useMemo(() => {
     return interactions.watchHistory
@@ -105,14 +126,36 @@ const MainContent: React.FC<MainContentProps> = ({
     return map;
   }, [interactions.watchHistory]);
 
+  // منطق سحب الشاشة للتحديث
+  const handleTouchStart = (e: React.TouchEvent) => setStartY(e.touches[0].pageY);
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (window.scrollY === 0 && e.touches[0].pageY - startY > 150 && !refreshing) {
+      setRefreshing(true);
+      onResetHistory();
+      setTimeout(() => setRefreshing(false), 1500);
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-14 pb-40" dir="rtl">
+    <div 
+      className="flex flex-col gap-14 pb-40" 
+      dir="rtl"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+    >
+      {/* مؤشر التحديث */}
+      {refreshing && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] bg-red-600 text-white px-6 py-2 rounded-full font-black text-xs shadow-[0_0_20px_red] animate-bounce">
+          جاري تجديد الرعب...
+        </div>
+      )}
+
       {/* هيدر ترحيبي */}
       <section className="flex items-center justify-between px-6 pt-4">
-        <div className="flex items-center gap-3">
-          <img src={LOGO_URL} className="w-14 h-14 rounded-full border-2 border-red-600 shadow-[0_0_20px_red]" />
+        <div className="flex items-center gap-3 cursor-pointer group" onClick={onHardReset}>
+          <img src={LOGO_URL} className="w-14 h-14 rounded-full border-2 border-red-600 shadow-[0_0_20px_red] group-active:scale-90 transition-all" />
           <div className="flex flex-col">
-             <h1 className="text-2xl font-black text-white italic leading-none">الحديقة المرعبة</h1>
+             <h1 className="text-2xl font-black text-white italic leading-none group-active:text-red-600">الحديقة المرعبة</h1>
              <span className="text-[9px] text-red-600 font-black uppercase tracking-[0.3em] mt-1">Horror Garden V4</span>
           </div>
         </div>
@@ -130,7 +173,7 @@ const MainContent: React.FC<MainContentProps> = ({
         <div className="grid grid-cols-2 gap-4">
           {shorts.slice(0, 4).map(v => (
             <div key={v.id} onClick={() => onPlayShort(v, shorts)} className="aspect-[9/16] rounded-3xl overflow-hidden border border-red-600/40 shadow-2xl bg-neutral-900 active:scale-95 transition-transform cursor-pointer relative group">
-              <video src={v.video_url} muted playsInline className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[5s]" />
+              <LiveThumbnail url={v.video_url} isShort className="group-hover:scale-110 transition-transform duration-[5s]" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
               <div className="absolute bottom-4 right-4 left-4 text-right">
                 <p className="text-white text-[11px] font-black line-clamp-1">{v.title}</p>
@@ -156,8 +199,8 @@ const MainContent: React.FC<MainContentProps> = ({
         <h2 className="text-xl font-black text-white italic border-r-4 border-red-600 pr-3 mr-2">أساطير مطولة</h2>
         <div className="flex flex-col gap-8">
           {longs.slice(0, 4).map(video => (
-            <div key={video.id} onClick={() => onPlayLong(video, longs)} className="relative aspect-video rounded-[2.5rem] overflow-hidden border-2 border-red-600 ring-4 ring-red-600/10 shadow-[0_0_30px_rgba(220,38,38,0.3)] active:scale-[0.98] transition-all cursor-pointer">
-              <video src={video.video_url} muted playsInline className="w-full h-full object-cover opacity-90" />
+            <div key={video.id} onClick={() => onPlayLong(video, longs)} className="relative aspect-video rounded-[2.5rem] overflow-hidden border-2 border-red-600 ring-4 ring-red-600/10 shadow-[0_0_30px_rgba(220,38,38,0.3)] active:scale-[0.98] transition-all cursor-pointer group">
+              <LiveThumbnail url={video.video_url} className="opacity-90 group-hover:scale-105 transition-transform duration-[8s]" />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/20"></div>
               <div className="absolute bottom-6 right-6 text-right left-6">
                 <span className="text-[10px] text-red-500 font-black uppercase tracking-[0.2em] bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-red-600/30">{video.category}</span>
@@ -180,7 +223,7 @@ const MainContent: React.FC<MainContentProps> = ({
         <div className="grid grid-cols-2 gap-4">
           {shorts.slice(4, 8).map(v => (
             <div key={v.id} onClick={() => onPlayShort(v, shorts)} className="aspect-[9/16] rounded-3xl overflow-hidden border border-red-600/40 shadow-2xl bg-neutral-900 active:scale-95 transition-transform cursor-pointer group">
-              <video src={v.video_url} muted playsInline className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[5s]" />
+              <LiveThumbnail url={v.video_url} className="group-hover:scale-110 transition-transform duration-[5s]" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
               <div className="absolute bottom-4 right-4 left-4 text-right">
                 <p className="text-white text-[11px] font-black line-clamp-1">{v.title}</p>
@@ -195,8 +238,8 @@ const MainContent: React.FC<MainContentProps> = ({
         <h2 className="text-xl font-black text-white italic border-r-4 border-red-600 pr-3 mr-2">كوابيس مستمرة</h2>
         <div className="flex flex-col gap-8">
           {longs.slice(4, 8).map(video => (
-            <div key={video.id} onClick={() => onPlayLong(video, longs)} className="relative aspect-video rounded-[2.5rem] overflow-hidden border-2 border-red-600 shadow-[0_0_30px_rgba(220,38,38,0.2)] active:scale-[0.98] transition-all cursor-pointer">
-              <video src={video.video_url} muted playsInline className="w-full h-full object-cover opacity-80" />
+            <div key={video.id} onClick={() => onPlayLong(video, longs)} className="relative aspect-video rounded-[2.5rem] overflow-hidden border-2 border-red-600 shadow-[0_0_30px_rgba(220,38,38,0.2)] active:scale-[0.98] transition-all cursor-pointer group">
+              <LiveThumbnail url={video.video_url} className="opacity-80 group-hover:scale-105" />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
               <div className="absolute bottom-6 right-6 text-right left-6">
                 <h3 className="text-white font-black text-lg drop-shadow-[0_2px_10px_black]">{video.title}</h3>
