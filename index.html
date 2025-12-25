@@ -68,6 +68,32 @@
         50% { transform: scale(1.08); opacity: 0.9; filter: brightness(1.5); }
       }
       .animate-pulse-fast { animation: pulse-fast 0.8s ease-in-out infinite; }
+
+      /* أنيميشن تحول اللون والتوهج عند النقر */
+      @keyframes flash-yellow {
+        0% { color: #ef4444; border-color: #ef4444; filter: drop-shadow(0 0 5px #ef4444); }
+        50% { color: #eab308; border-color: #eab308; filter: drop-shadow(0 0 25px #eab308); }
+        100% { color: #ef4444; border-color: #ef4444; filter: drop-shadow(0 0 5px #ef4444); }
+      }
+      .animate-flash-yellow {
+        animation: flash-yellow 1s ease-in-out;
+      }
+
+      /* شريط تحميل احترافي في الأعلى */
+      @keyframes loading-bar {
+        0% { width: 0; left: 0; }
+        50% { width: 100%; left: 0; }
+        100% { width: 0; left: 100%; }
+      }
+      .loading-indicator {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #ef4444, transparent);
+        z-index: 2000;
+        animation: loading-bar 1.5s infinite linear;
+      }
     </style>
   <script type="importmap">
 {

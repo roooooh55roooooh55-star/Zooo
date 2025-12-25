@@ -22,6 +22,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedShort, setSelectedShort] = useState<{ video: Video, list: Video[] } | null>(null);
   const [selectedLong, setSelectedLong] = useState<{ video: Video, list: Video[] } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const [deletedByAdmin, setDeletedByAdmin] = useState<string[]>(() => {
     const saved = localStorage.getItem('al-hadiqa-deleted-ids');
@@ -45,6 +46,11 @@ const App: React.FC = () => {
     return { likedIds: [], dislikedIds: [], savedIds: [], watchHistory: [] };
   });
 
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  };
+
   useEffect(() => {
     localStorage.setItem('al-hadiqa-interactions', JSON.stringify(interactions));
   }, [interactions]);
@@ -66,16 +72,12 @@ const App: React.FC = () => {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // وظيفة إعادة التشغيل الكامل ومسح الذاكرة (Hard Refresh)
   const handleHardReset = useCallback(() => {
-    // مسح الفيديوهات المشاهدة من الذاكرة لتعود للظهور
-    const confirmReset = window.confirm("هل تريد إعادة تحميل الحديقة وتحديث المحتوى بالكامل؟");
-    if (confirmReset) {
-      setInteractions(prev => ({ ...prev, watchHistory: [] }));
-      loadData();
-      // تمرير الصفحة للأعلى
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    // إزالة نافذة التأكيد التقليدية والاكتفاء بتنفيذ الأمر مع تنبيه عصري
+    setInteractions(prev => ({ ...prev, watchHistory: [] }));
+    loadData();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast("تم تحديث الحديقة بنجاح");
   }, [loadData]);
 
   const updateWatchHistory = (id: string, progress: number) => {
@@ -100,10 +102,14 @@ const App: React.FC = () => {
           onUpdatePassword={setAdminPassword}
           categories={categories}
           onUpdateCategories={setCategories}
-          onNewVideo={(v) => setRawVideos(prev => [v, ...prev])}
+          onNewVideo={(v) => {
+            setRawVideos(prev => [v, ...prev]);
+            showToast("تم رفع الفيديو");
+          }}
           onDeleteVideo={(id) => {
              setDeletedByAdmin(p => [...p, id]);
              setRawVideos(v => v.filter(x => (x.id || x.video_url) !== id));
+             showToast("تم الحذف نهائياً");
           }}
         />
       );
@@ -126,6 +132,7 @@ const App: React.FC = () => {
             onResetHistory={loadData}
             onHardReset={handleHardReset}
             loading={loading}
+            onShowToast={showToast}
           />
         );
     }
@@ -137,6 +144,13 @@ const App: React.FC = () => {
       <main className="pt-24">{renderContent()}</main>
       <AIOracle />
       
+      {/* Toast Notification System */}
+      {toast && (
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[1100] bg-red-600/90 backdrop-blur-xl border border-red-400 text-white px-8 py-3 rounded-full font-black text-xs shadow-[0_0_30px_red] animate-in slide-in-from-top-10 duration-500">
+          {toast}
+        </div>
+      )}
+
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-[1000] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl">
           <div className="w-full bg-neutral-900 border-2 border-red-600/30 rounded-[3rem] p-10 shadow-[0_0_50px_red]">
@@ -150,7 +164,7 @@ const App: React.FC = () => {
             <div className="flex gap-4">
               <button onClick={() => {
                 if(authInput === adminPassword) { setIsAuthModalOpen(false); setCurrentView(AppView.ADMIN); setAuthInput(''); }
-                else { setAuthInput(''); alert('رمز غير صحيح'); }
+                else { setAuthInput(''); showToast('رمز غير صحيح'); }
               }} className="flex-1 bg-red-600 py-4 rounded-xl font-black text-white shadow-[0_0_20px_red]">دخول</button>
               <button onClick={() => setIsAuthModalOpen(false)} className="px-6 bg-white/10 text-gray-400 py-4 rounded-xl font-bold">إلغاء</button>
             </div>
