@@ -1,137 +1,163 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 
-// إعدادات المستودع الخاصة بك
+// إعدادات المستودع
 const CLOUD_NAME = 'dlrvn33p0';
-const UPLOAD_PRESET = 'Good.zooo';
-const FOLDER_TAG = 'horror';
+const TAG = 'horror';
+const PRESET = 'Good.zooo';
 
 const App = () => {
-  const [videos, setVideos] = useState([]);
+  const [videos, setVideos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isUploading, setIsUploading] = useState(false);
 
-  // جلب الفيديوهات عند التشغيل
-  useEffect(() => {
-    fetchVideos();
-  }, []);
-
+  // جلب الفيديوهات
   const fetchVideos = async () => {
     try {
-      const res = await fetch(`https://res.cloudinary.com/${CLOUD_NAME}/video/list/${FOLDER_TAG}.json?timestamp=${Date.now()}`);
+      const res = await fetch(`https://res.cloudinary.com/${CLOUD_NAME}/video/list/${TAG}.json?cb=${Date.now()}`);
       const data = await res.json();
       setVideos(data.resources || []);
       setLoading(false);
     } catch (err) {
-      console.error("خطأ في جلب البيانات");
       setLoading(false);
     }
   };
 
-  // وظيفة الرفع (تستخدم Widget Cloudinary المدمج في تطبيقك)
-  const openUploadWidget = () => {
+  useEffect(() => {
+    fetchVideos();
+  }, []);
+
+  // ويدجت الرفع المدمج
+  const handleUpload = () => {
     // @ts-ignore
-    const widget = window.cloudinary.createUploadWidget(
-      {
-        cloudName: CLOUD_NAME,
-        uploadPreset: UPLOAD_PRESET,
-        tags: [FOLDER_TAG],
-        sources: ['local', 'camera'],
-        styles: { palette: { window: '#000000', sourceBg: '#000000', windowBorder: '#FF0000' } }
-      },
-      (error, result) => {
-        if (!error && result && result.event === "success") {
-          setIsUploading(false);
-          fetchVideos(); // تحديث القائمة فوراً
-        }
+    const myWidget = window.cloudinary.createUploadWidget({
+      cloudName: CLOUD_NAME, 
+      uploadPreset: PRESET,
+      tags: [TAG],
+      sources: ['local', 'camera'],
+      styles: { 
+        palette: { 
+          window: '#000000', 
+          sourceBg: '#000000',
+          windowBorder: '#FF0000',
+          tabIcon: '#FF0000',
+          inactiveTabIcon: '#555555',
+          menuIcons: '#ffffff',
+          link: '#FF0000',
+          action: '#FF0000',
+          inProgress: '#FF0000',
+          complete: '#20B832',
+          error: '#FF0000',
+          textDark: '#000000',
+          textLight: '#ffffff'
+        } 
       }
-    );
-    widget.open();
+    }, (error: any, result: any) => {
+        if (!error && result && result.event === "success") { 
+          fetchVideos();
+        }
+    });
+    myWidget.open();
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] relative overflow-hidden">
-      {/* شريط التحميل العلوي (الذي طلبته) */}
-      {loading && <div className="fixed top-0 left-0 h-[3px] bg-red-600 shadow-[0_0_15px_#ef4444] z-[2000] animate-[loading-bar_1.5s_infinite_linear]"></div>}
+    <div className="min-h-screen bg-[#050505] text-white">
+      {/* مؤشر التحميل العلوي نيون */}
+      {loading && (
+        <div className="fixed top-0 left-0 h-[2px] bg-red-600 shadow-[0_0_15px_#ff0000] z-[2000] w-full animate-pulse"></div>
+      )}
 
-      {/* الهيدر مع الماركي المتحرك */}
-      <header className="p-6 space-y-4">
-        <div className="flex justify-between items-center">
+      {/* الهيدر بتصميمك الأصلي */}
+      <header className="p-6 border-b border-white/5 bg-black/50 backdrop-blur-md sticky top-0 z-50">
+        <div class="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center font-black text-2xl shadow-[0_0_20px_rgba(239,68,68,0.4)] animate-pulse">H</div>
-            <h1 className="text-2xl font-black tracking-tighter italic">الحديقة <span className="text-red-600">AL-HADIQA</span></h1>
+            <div className="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center font-black text-2xl shadow-[0_0_20px_rgba(239,68,68,0.5)]">H</div>
+            <div>
+                <h1 className="text-xl font-black italic tracking-tighter">الحديقة</h1>
+                <p className="text-[10px] text-red-600 font-bold tracking-[0.2em]">AL-HADIQA</p>
+            </div>
           </div>
           <button 
-            onClick={openUploadWidget}
-            className="bg-white/5 border border-red-600/30 px-4 py-2 rounded-2xl text-[10px] font-bold hover:bg-red-600 transition-all active:scale-95"
+            onClick={handleUpload}
+            className="bg-white/5 border border-red-600/30 text-white text-[10px] font-bold px-6 py-3 rounded-2xl hover:bg-red-600 transition-all active:scale-95 shadow-lg shadow-red-600/10"
           >
-            UPLOAD +
+            UPLOAD VIDEO +
           </button>
         </div>
 
-        {/* شريط الماركي المتحرك */}
-        <div className="overflow-hidden whitespace-nowrap border-y border-white/5 py-2">
-          <div className="inline-block animate-[marquee-r-to-l_15s_linear_infinite] text-[10px] font-bold tracking-widest text-red-500/50 uppercase">
-             • HORROR STORIES • AI GENERATED • NO WATERMARK • AL-HADIQA PROJECT • PREVIEW MODE • NO LIMITS • 
-             • HORROR STORIES • AI GENERATED • NO WATERMARK • AL-HADIQA PROJECT • PREVIEW MODE • NO LIMITS • 
+        {/* الماركي المتحرك */}
+        <div className="overflow-hidden py-2 opacity-50">
+          <div className="flex gap-12 animate-[marquee-r-to-l_25s_linear_infinite] whitespace-nowrap text-[9px] font-bold tracking-widest uppercase">
+            <span>• Al-Hadiqa Horror System • AI Powered Content • Secure Storage • No Watermark Area •</span>
+            <span>• Al-Hadiqa Horror System • AI Powered Content • Secure Storage • No Watermark Area •</span>
           </div>
         </div>
       </header>
 
-      {/* عرض الفيديوهات */}
-      <main className="px-4 pb-20 space-y-10">
-        
+      <main className="p-4 space-y-12">
         {/* قسم الشورتس */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {videos.filter(v => v.width < v.height).map((video) => (
-            <div key={video.public_id} className="relative aspect-[9/16] rounded-[2rem] overflow-hidden border border-white/5 group">
-              <video 
-                src={`https://res.cloudinary.com/${CLOUD_NAME}/video/upload/q_auto,f_auto/${video.public_id}.mp4`}
-                className="w-full h-full object-cover"
-                loop muted playsInline onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()}
-              />
-              
-              {/* شريط النيون لتغطية العلامة المائية في الأسفل */}
-              <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black via-black/80 to-transparent flex items-center justify-center">
-                 <div className="w-[80%] h-[2px] bg-red-600 shadow-[0_0_15px_#ff0000,0_0_5px_#ff0000] rounded-full relative overflow-hidden">
-                    <div className="absolute inset-0 bg-white/40 animate-[marquee-l-to-r_2s_linear_infinite]"></div>
-                 </div>
-                 <p className="absolute bottom-2 text-[8px] font-bold tracking-[0.3em] text-red-500 opacity-70">AL-HADIQA AI</p>
+        <section>
+          <div className="flex items-center gap-2 mb-6 px-2">
+            <div className="w-1 h-4 bg-red-600 rounded-full"></div>
+            <h2 className="text-xs font-black tracking-widest text-gray-400 uppercase">Shorts Experience</h2>
+          </div>
+          
+          <div className="flex gap-4 overflow-x-auto pb-6 px-2 no-scrollbar">
+            {videos.filter(v => v.width < v.height).map(video => (
+              <div key={video.public_id} className="relative min-w-[220px] aspect-[9/16] bg-neutral-900 rounded-[2.5rem] overflow-hidden border border-white/5 shadow-2xl">
+                <video 
+                  src={`https://res.cloudinary.com/${CLOUD_NAME}/video/upload/q_auto,f_auto/${video.public_id}.mp4`}
+                  className="w-full h-full object-cover"
+                  loop muted playsInline onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()}
+                />
+                
+                {/* شريط نيون ذكي لتغطية العلامة المائية */}
+                <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black via-black/95 to-transparent flex flex-col items-center justify-end pb-4 gap-3">
+                  <div className="w-[80%] h-[2px] bg-red-600 shadow-[0_0_15px_#ff0000,0_0_5px_#ff0000] rounded-full relative overflow-hidden">
+                    <div className="absolute inset-0 bg-white/30 animate-[marquee-l-to-r_2s_linear_infinite]"></div>
+                  </div>
+                  <span className="text-[7px] font-black text-red-600 tracking-[0.6em] opacity-80 uppercase">Protected by Al-Hadiqa AI</span>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </section>
 
-        {/* قسم الفيديوهات العريضة */}
-        <div className="space-y-6">
-          {videos.filter(v => v.width >= v.height).map((video) => (
-            <div key={video.public_id} className="relative aspect-video rounded-[2.5rem] overflow-hidden border border-white/5">
+        {/* قسم الحلقات الطويلة */}
+        <section className="space-y-8 px-2 pb-20">
+          <div className="flex items-center gap-2 mb-6">
+            <div className="w-1 h-4 bg-gray-600 rounded-full"></div>
+            <h2 className="text-xs font-black tracking-widest text-gray-400 uppercase">Full Episodes</h2>
+          </div>
+          
+          {videos.filter(v => v.width >= v.height).map(video => (
+            <div key={video.public_id} className="relative aspect-video bg-neutral-900 rounded-[3rem] overflow-hidden border border-white/5 shadow-2xl group">
               <video 
                 src={`https://res.cloudinary.com/${CLOUD_NAME}/video/upload/q_auto,f_auto/${video.public_id}.mp4`}
                 className="w-full h-full object-cover"
                 controls
               />
-              {/* شريط نيون عريض للفيديو العرضي */}
-              <div className="absolute bottom-0 left-0 right-0 h-12 bg-black/60 backdrop-blur-md flex items-center px-6 border-t border-red-600/30">
-                 <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse shadow-[0_0_10px_#ff0000]"></div>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Al-Hadiqa Secure Player</span>
-                 </div>
+              {/* حماية النيون للفيديو العريض */}
+              <div className="absolute bottom-0 left-0 right-0 h-12 bg-black/80 backdrop-blur-xl flex items-center px-8 border-t border-red-600/20 group-hover:border-red-600/50 transition-colors">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-red-600 rounded-full animate-pulse shadow-[0_0_10px_#ff0000]"></div>
+                  <span className="text-[8px] font-bold text-gray-500 tracking-widest uppercase italic">Al-Hadiqa Original Content</span>
+                </div>
               </div>
             </div>
           ))}
-        </div>
+        </section>
       </main>
 
-      {loading && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black z-50">
-           <div className="w-16 h-16 border-4 border-red-600/20 border-t-red-600 rounded-full animate-spin"></div>
-        </div>
-      )}
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        @keyframes marquee-r-to-l { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        @keyframes marquee-l-to-r { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+      `}</style>
     </div>
   );
 };
 
 const root = createRoot(document.getElementById('root')!);
 root.render(<App />);
+
 
