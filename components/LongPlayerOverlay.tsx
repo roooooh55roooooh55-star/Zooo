@@ -63,7 +63,7 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
       v.removeEventListener('timeupdate', updateTime);
       v.removeEventListener('ended', handleEnd);
     };
-  }, [video, suggestions, onSwitchVideo]);
+  }, [video, suggestions, onSwitchVideo, isMuted]);
 
   const toggleFullScreen = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -79,6 +79,7 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
       className={`fixed inset-0 bg-black z-[200] flex flex-col transition-all duration-500 overflow-hidden ${isFullScreen ? 'z-[400]' : ''}`}
     >
       <div className={`relative flex flex-col transition-all duration-500 ${isFullScreen ? 'h-full w-full' : 'h-[35dvh] mt-4 p-2'}`}>
+        {/* أزرار التحكم */}
         <div className={`absolute flex justify-between items-center z-[220] transition-all duration-500 ${
           isFullScreen 
           ? 'top-0 bottom-0 left-8 flex-col py-12' 
@@ -105,6 +106,7 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
           </button>
         </div>
 
+        {/* حاوية الفيديو مع ميزة الدوران وملء الإطار بالكامل */}
         <div 
           className="relative w-full h-full bg-black flex items-center justify-center cursor-pointer overflow-hidden"
           onClick={() => setIsPaused(!isPaused)}
@@ -113,13 +115,13 @@ const LongPlayerOverlay: React.FC<LongPlayerOverlayProps> = ({
             ref={videoRef}
             src={video.video_url}
             style={isFullScreen ? {
-              width: '100dvh',
-              height: '100dvw',
+              width: '100dvh', // العرض يطابق طول الشاشة عند الدوران
+              height: '100dvw', // الطول يطابق عرض الشاشة عند الدوران
               position: 'absolute',
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%) rotate(90deg)',
-              objectFit: 'cover',
+              objectFit: 'cover', // يملأ كامل الإطار
               backgroundColor: 'black'
             } : {
               width: '100%',

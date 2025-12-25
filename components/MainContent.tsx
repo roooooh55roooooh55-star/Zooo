@@ -20,12 +20,12 @@ export const formatBigNumber = (num: number) => {
 };
 
 const LiveThumbnail: React.FC<{ url: string, isShort?: boolean, className?: string, isGlobalPlayerOpen?: boolean }> = ({ url, isShort, className, isGlobalPlayerOpen }) => {
-  // إذا كان هناك فيديو يعمل حالياً، نمنع تحميل المصغرات تماماً لتوفير الباندويث
-  if (isGlobalPlayerOpen) return <div className={`bg-black ${className}`} />;
+  // إذا كان هناك فيديو يعمل حالياً، نمنع تحميل أي مصغرات تماماً لتوفير الأداء للفيديو النشط
+  if (isGlobalPlayerOpen) return <div className={`bg-black/40 ${className}`} />;
 
   return (
     <video 
-      src={url} muted autoPlay loop playsInline preload="metadata"
+      src={url} muted autoPlay loop playsInline preload="none"
       className={`w-full h-full object-cover bg-black ${className}`}
     />
   );
@@ -134,10 +134,10 @@ const MainContent: React.FC<MainContentProps> = ({
   });
 
   const filteredVideos = useMemo(() => {
-    // استبعاد الفيديوهات التي لم يعجب بها (Disliked) والفيديوهات المكتملة جداً
-    const excludedIds = [...interactions.dislikedIds, ...interactions.watchHistory.filter(h => h.progress > 0.98).map(h => h.id)];
+    // استبعاد الفيديوهات التي تم التفاعل معها (إعجاب أو ديسكلايك) من الصفحة الرئيسية
+    const excludedIds = [...interactions.dislikedIds, ...interactions.likedIds];
     return videos.filter(v => !excludedIds.includes(v.id || v.video_url));
-  }, [videos, interactions.dislikedIds, interactions.watchHistory]);
+  }, [videos, interactions.dislikedIds, interactions.likedIds]);
 
   const shorts = useMemo(() => filteredVideos.filter(v => v.type === 'short'), [filteredVideos]);
   const longs = useMemo(() => filteredVideos.filter(v => v.type === 'long'), [filteredVideos]);
@@ -172,7 +172,9 @@ const MainContent: React.FC<MainContentProps> = ({
 
   const triggerHardReset = () => {
     setIsFlashing(true);
+    // مسح الكاش وتحديث القائمة
     if (onHardReset) onHardReset();
+    if (onShowToast) onShowToast("تم مسح الكاش وتجديد الرعب");
     setTimeout(() => setIsFlashing(false), 800);
   };
 
@@ -261,7 +263,9 @@ const MainContent: React.FC<MainContentProps> = ({
         </div>
       )}
 
+      {/* قسم الشورتس فقط */}
       <section className="px-4 -mt-2">
+        <h2 className="text-sm font-black text-gray-400 mb-4 pr-3 border-r-2 border-red-600">كوابيس خاطفة (Shorts)</h2>
         <div className="grid grid-cols-2 gap-3">
           {shorts.slice(0, 4).map(v => (
             <div key={v.id} onClick={() => onPlayShort(v, shorts)} className="aspect-[9/16] rounded-3xl overflow-hidden border border-white/10 shadow-lg bg-neutral-900 active:scale-95 transition-all cursor-pointer relative group">
@@ -285,6 +289,7 @@ const MainContent: React.FC<MainContentProps> = ({
         </section>
       )}
 
+      {/* قسم مخصص للأفلام الطويلة فقط */}
       <section className="px-4 space-y-6 pt-6 border-t border-white/5 bg-gradient-to-b from-red-600/5 to-transparent rounded-t-[3rem]">
         <div className="flex flex-col items-center mb-8">
            <h2 className="text-xl font-black text-white italic tracking-tighter">أفلام الرعب الكاملة</h2>
@@ -304,6 +309,7 @@ const MainContent: React.FC<MainContentProps> = ({
         </div>
       </section>
 
+      {/* أرشيف اللقطات الخاطفة (إضافي) */}
       <section className="px-4 py-8 bg-black/30 border-t border-white/5">
         <h2 className="text-lg font-black text-white italic mb-4 border-r-4 border-red-600 pr-3 mr-2 opacity-80">أرشيف اللقطات الخاطفة</h2>
         <div className="grid grid-cols-2 gap-3">

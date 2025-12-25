@@ -59,7 +59,7 @@ const App: React.FC = () => {
     setLoading(true);
     try {
       const data = await fetchCloudinaryVideos();
-      // خلط عشوائي لضمان التجديد المستمر
+      // خلط الفيديوهات عشوائياً لضمان التجديد المستمر عند كل تحديث
       const shuffled = data.sort(() => Math.random() - 0.5);
       const filtered = shuffled.filter(v => !deletedByAdmin.includes(v.id || v.video_url));
       setRawVideos(filtered);
@@ -73,10 +73,10 @@ const App: React.FC = () => {
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleHardReset = useCallback(() => {
-    setInteractions(prev => ({ ...prev, watchHistory: [] }));
+    // تصفير التفاعلات يدوياً إذا لزم الأمر، لكننا هنا سنركز على تجديد المحتوى
     loadData();
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    showToast("تم تحديث الحديقة ومسح الكاش");
+    showToast("تم تجديد قائمة الرعب بنجاح");
   }, [loadData]);
 
   const updateWatchHistory = (id: string, progress: number) => {
@@ -110,7 +110,7 @@ const App: React.FC = () => {
           onDeleteVideo={(id) => {
              setDeletedByAdmin(p => [...p, id]);
              setRawVideos(v => v.filter(x => (x.id || x.video_url) !== id));
-             showToast("تم الحذف نهائياً");
+             showToast("تم الحذف من المستودع");
           }}
         />
       );
@@ -180,8 +180,22 @@ const App: React.FC = () => {
           videoList={selectedShort.list} 
           interactions={interactions}
           onClose={() => setSelectedShort(null)} 
-          onLike={(id) => setInteractions(p => ({...p, likedIds: p.likedIds.includes(id) ? p.likedIds.filter(x => x !== id) : [...p.likedIds, id], dislikedIds: p.dislikedIds.filter(x => x !== id)}))} 
-          onDislike={(id) => setInteractions(p => ({...p, dislikedIds: p.dislikedIds.includes(id) ? p.dislikedIds.filter(x => x !== id) : [...p.dislikedIds, id], likedIds: p.likedIds.filter(x => x !== id)}))} 
+          onLike={(id) => {
+            setInteractions(p => ({
+              ...p, 
+              likedIds: p.likedIds.includes(id) ? p.likedIds.filter(x => x !== id) : [...p.likedIds, id], 
+              dislikedIds: p.dislikedIds.filter(x => x !== id)
+            }));
+            showToast("تمت الإضافة للمفضلة");
+          }} 
+          onDislike={(id) => {
+            setInteractions(p => ({
+              ...p, 
+              dislikedIds: p.dislikedIds.includes(id) ? p.dislikedIds.filter(x => x !== id) : [...p.dislikedIds, id], 
+              likedIds: p.likedIds.filter(x => x !== id)
+            }));
+            showToast("تم استبعاد الفيديو");
+          }} 
           onSave={(id) => setInteractions(p => ({...p, savedIds: p.savedIds.includes(id) ? p.savedIds.filter(x => x !== id) : [...p.savedIds, id]}))} 
           onProgress={updateWatchHistory}
         />
@@ -192,8 +206,25 @@ const App: React.FC = () => {
           video={selectedLong.video} 
           allLongVideos={selectedLong.list}
           onClose={() => setSelectedLong(null)}
-          onLike={() => setInteractions(p => ({...p, likedIds: p.likedIds.includes(selectedLong.video.id) ? p.likedIds.filter(x => x !== selectedLong.video.id) : [...p.likedIds, selectedLong.video.id], dislikedIds: p.dislikedIds.filter(x => x !== selectedLong.video.id)}))}
-          onDislike={() => setInteractions(p => ({...p, dislikedIds: p.dislikedIds.includes(selectedLong.video.id) ? p.dislikedIds.filter(x => x !== selectedLong.video.id) : [...p.dislikedIds, selectedLong.video.id], likedIds: p.likedIds.filter(x => x !== selectedLong.video.id)}))}
+          onLike={() => {
+            const id = selectedLong.video.id;
+            setInteractions(p => ({
+              ...p, 
+              likedIds: p.likedIds.includes(id) ? p.likedIds.filter(x => x !== id) : [...p.likedIds, id], 
+              dislikedIds: p.dislikedIds.filter(x => x !== id)
+            }));
+            showToast("تمت الإضافة للمفضلة");
+          }}
+          onDislike={() => {
+            const id = selectedLong.video.id;
+            setInteractions(p => ({
+              ...p, 
+              dislikedIds: p.dislikedIds.includes(id) ? p.dislikedIds.filter(x => x !== id) : [...p.dislikedIds, id], 
+              likedIds: p.likedIds.filter(x => x !== id)
+            }));
+            showToast("تم استبعاد الفيديو");
+            setSelectedLong(null); // إغلاق المشغل لأن الفيديو تم استبعاده
+          }}
           onSave={() => setInteractions(p => ({...p, savedIds: p.savedIds.includes(selectedLong.video.id) ? p.savedIds.filter(x => x !== selectedLong.video.id) : [...p.savedIds, selectedLong.video.id]}))}
           onSwitchVideo={(v) => setSelectedLong({ video: v, list: selectedLong.list })}
           isLiked={interactions.likedIds.includes(selectedLong.video.id)} 
