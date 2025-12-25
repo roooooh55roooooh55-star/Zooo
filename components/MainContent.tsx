@@ -3,7 +3,6 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Video, UserInteractions } from '../types.ts';
 
 const LOGO_URL = "https://i.top4top.io/p_3643ksmii1.jpg";
-const LION_URL = "https://cdn-icons-png.flaticon.com/512/616/616412.png"; 
 
 export const getDeterministicStats = (url: string) => {
   let hash = 0;
@@ -85,6 +84,31 @@ const InteractiveMarquee: React.FC<{
   );
 };
 
+// أيقونة الأسد نيون تفاعلية
+const LionNeonIcon: React.FC<{ status: 'idle' | 'downloading' | 'cached', onClick: () => void }> = ({ status, onClick }) => {
+  const color = status === 'cached' ? '#22c55e' : (status === 'downloading' ? '#eab308' : '#ef4444');
+  const shadow = status === 'cached' ? 'rgba(34,197,94,0.6)' : (status === 'downloading' ? 'rgba(234,179,8,0.6)' : 'rgba(239,68,68,0.6)');
+
+  return (
+    <button 
+      onClick={onClick}
+      className={`w-14 h-14 bg-black border-2 rounded-full p-2.5 transition-all duration-700 active:scale-75 shadow-[0_0_20px_var(--shadow)] ${status === 'downloading' ? 'animate-pulse' : ''}`}
+      style={{ borderColor: color, '--shadow': shadow } as any}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+        {/* رسمة أسد نيون مبسطة */}
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" opacity="0.2"/>
+        <path d="M8 10c0-2 1-3 4-3s4 1 4 3"/>
+        <path d="M9 13c-1 0-2 1-2 2s1 2 2 2h6c1 0 2-1 2-2s-1-2-2-2"/>
+        <path d="M12 11v2"/>
+        <circle cx="10" cy="9.5" r="0.5" fill={color}/>
+        <circle cx="14" cy="9.5" r="0.5" fill={color}/>
+        <path d="M7 7l2 2m8-2l-2 2m1 11l-2-2m-6 2l2-2" opacity="0.6"/>
+      </svg>
+    </button>
+  );
+};
+
 interface MainContentProps {
   videos: Video[];
   categoriesList: string[];
@@ -101,6 +125,9 @@ const MainContent: React.FC<MainContentProps> = ({
 }) => {
   const [startY, setStartY] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [cacheStatus, setCacheStatus] = useState<'idle' | 'downloading' | 'cached'>(() => {
+    return localStorage.getItem('al-hadiqa-offline-ready') === 'true' ? 'cached' : 'idle';
+  });
 
   // تصفية الفيديوهات: إخفاء أي فيديو تم مشاهدة أكثر من 90% منه
   const filteredVideos = useMemo(() => {
@@ -136,6 +163,44 @@ const MainContent: React.FC<MainContentProps> = ({
     }
   };
 
+  // وظيفة زر الأسد (تحميل للفيديوهات للعمل بدون إنترنت)
+  const toggleOfflineCache = async () => {
+    if (cacheStatus === 'cached') {
+      const confirmClear = window.confirm("هل تريد مسح الفيديوهات المحملة من ذاكرة الهاتف؟");
+      if (confirmClear) {
+        const cache = await caches.open('hadiqa-video-cache');
+        const keys = await cache.keys();
+        for (const key of keys) await cache.delete(key);
+        setCacheStatus('idle');
+        localStorage.removeItem('al-hadiqa-offline-ready');
+        alert("تم مسح الذاكرة المؤقتة.");
+      }
+      return;
+    }
+
+    setCacheStatus('downloading');
+    try {
+      const cache = await caches.open('hadiqa-video-cache');
+      const videosToCache = videos.slice(0, 15); // تحميل أول 15 فيديو لضمان السرعة
+      
+      let count = 0;
+      for (const v of videosToCache) {
+        try {
+          await cache.add(v.video_url);
+          count++;
+        } catch (e) { console.error("Failed to cache:", v.title); }
+      }
+      
+      setCacheStatus('cached');
+      localStorage.setItem('al-hadiqa-offline-ready', 'true');
+      alert(`تم تحميل ${count} فيديوهات بنجاح للعمل بدون إنترنت.`);
+    } catch (err) {
+      console.error(err);
+      setCacheStatus('idle');
+      alert("حدث خطأ أثناء التحميل.");
+    }
+  };
+
   return (
     <div 
       className="flex flex-col gap-14 pb-40" 
@@ -152,16 +217,18 @@ const MainContent: React.FC<MainContentProps> = ({
 
       {/* هيدر ترحيبي */}
       <section className="flex items-center justify-between px-6 pt-4">
-        <div className="flex items-center gap-3 cursor-pointer group" onClick={onHardReset}>
-          <img src={LOGO_URL} className="w-14 h-14 rounded-full border-2 border-red-600 shadow-[0_0_20px_red] group-active:scale-90 transition-all" />
-          <div className="flex flex-col">
-             <h1 className="text-2xl font-black text-white italic leading-none group-active:text-red-600">الحديقة المرعبة</h1>
-             <span className="text-[9px] text-red-600 font-black uppercase tracking-[0.3em] mt-1">Horror Garden V4</span>
+        <div className="flex flex-col cursor-pointer group" onClick={onHardReset}>
+          <div className="flex items-center gap-3">
+            <img src={LOGO_URL} className="w-14 h-14 rounded-full border-2 border-red-600 shadow-[0_0_20px_red] group-active:scale-90 transition-all" />
+            <div className="flex flex-col">
+               <h1 className="text-2xl font-black text-white italic leading-none group-active:text-red-600">الحديقة المرعبة</h1>
+               <span className="text-[9px] text-red-600 font-black uppercase tracking-[0.3em] mt-1">Horror Garden V4</span>
+            </div>
           </div>
+          <p className="text-[7px] text-gray-600 font-bold mt-2 pr-1 animate-pulse">انقر على العنوان لتحديث المحتوى ومسح الكاش</p>
         </div>
-        <button onClick={onResetHistory} className="w-12 h-12 bg-black border-2 border-red-600 rounded-full p-2 animate-spin-slow shadow-[0_0_15px_rgba(220,38,38,0.3)]">
-          <img src={LION_URL} className="w-full h-full object-contain" />
-        </button>
+        
+        <LionNeonIcon status={cacheStatus} onClick={toggleOfflineCache} />
       </section>
 
       {/* 1. أول 4 فيديوهات شورتس (2 بجانب بعض) */}

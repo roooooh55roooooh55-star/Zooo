@@ -53,7 +53,7 @@ const App: React.FC = () => {
     setLoading(true);
     try {
       const data = await fetchCloudinaryVideos();
-      // خلط الفيديوهات عشوائياً عند التحميل لضمان التغيير المستمر
+      // خلط الفيديوهات عشوائياً في كل مرة لضمان التجديد المستمر
       const shuffled = data.sort(() => Math.random() - 0.5);
       const filtered = shuffled.filter(v => !deletedByAdmin.includes(v.id || v.video_url));
       setRawVideos(filtered);
@@ -66,13 +66,17 @@ const App: React.FC = () => {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // وظيفة إعادة التشغيل الكامل ومسح الذاكرة
+  // وظيفة إعادة التشغيل الكامل ومسح الذاكرة (Hard Refresh)
   const handleHardReset = useCallback(() => {
-    if (window.confirm("هل تريد إعادة ضبط الحديقة ومسح الذاكرة المؤقتة؟")) {
-      localStorage.clear();
-      window.location.reload();
+    // مسح الفيديوهات المشاهدة من الذاكرة لتعود للظهور
+    const confirmReset = window.confirm("هل تريد إعادة تحميل الحديقة وتحديث المحتوى بالكامل؟");
+    if (confirmReset) {
+      setInteractions(prev => ({ ...prev, watchHistory: [] }));
+      loadData();
+      // تمرير الصفحة للأعلى
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, []);
+  }, [loadData]);
 
   const updateWatchHistory = (id: string, progress: number) => {
     setInteractions(prev => {
